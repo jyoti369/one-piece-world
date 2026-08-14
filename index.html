@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The World As You Know It</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #131a30;
+    --panel2: #1a2340;
+    --ink: #e8ecf8;
+    --muted: #8b94b0;
+    --accent: #f5c542;
+    --line: #2a3558;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  header {
+    padding: 10px 16px 8px;
+    background: linear-gradient(180deg, #10172e, var(--bg));
+    border-bottom: 1px solid var(--line);
+    z-index: 5;
+  }
+  .toprow { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  h1 { font-size: 19px; letter-spacing: 0.5px; }
+  h1 .gold { color: var(--accent); }
+  .sub { color: var(--muted); font-size: 12px; }
+  .controls {
+    display: flex; align-items: center; gap: 12px;
+    margin-top: 8px; flex-wrap: wrap;
+  }
+  .epbox {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; padding: 5px 10px;
+  }
+  .epbox label { font-size: 12px; color: var(--muted); }
+  #epnum {
+    font-size: 20px; font-weight: 700; color: var(--accent);
+    min-width: 52px; text-align: right; font-variant-numeric: tabular-nums;
+  }
+  button {
+    background: var(--panel2); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 14px; font-size: 13px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #1a1408; font-weight: 700; border: none; }
+  #search {
+    background: var(--panel); border: 1px solid var(--line);
+    color: var(--ink); border-radius: 8px; padding: 7px 12px;
+    font-size: 13px; width: 190px;
+  }
+  #search:focus { outline: none; border-color: var(--accent); }
+  .sliderwrap { flex: 1; min-width: 260px; position: relative; padding-top: 14px; }
+  #slider { width: 100%; accent-color: var(--accent); cursor: pointer; }
+  .arcticks { position: absolute; top: 0; left: 0; right: 0; height: 13px; }
+  .arcticks span {
+    position: absolute; font-size: 9px; color: var(--muted);
+    transform: translateX(-50%); white-space: nowrap;
+  }
+  #stage { flex: 1; position: relative; }
+  canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+  canvas.dragging { cursor: grabbing; }
+  #tooltip {
+    position: absolute; pointer-events: none; display: none;
+    background: rgba(19,26,48,0.95); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px 10px; font-size: 12px; z-index: 8;
+    max-width: 240px;
+  }
+  #tooltip .tt-name { font-weight: 700; color: var(--accent); }
+  #card {
+    position: absolute; top: 12px; right: 12px; width: 290px;
+    max-height: calc(100% - 24px); overflow-y: auto;
+    background: rgba(19,26,48,0.97); border: 1px solid var(--line);
+    border-radius: 12px; padding: 16px; display: none; z-index: 9;
+  }
+  #card h2 { font-size: 17px; color: var(--accent); }
+  #card .epithet { font-style: italic; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+  #card .meta { font-size: 12px; color: var(--muted); margin: 8px 0; line-height: 1.7; }
+  #card .meta b { color: var(--ink); font-weight: 600; }
+  #card .desc { font-size: 13px; line-height: 1.55; margin: 8px 0; }
+  #card .rels { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+  #card .rels h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
+  #card .rel { font-size: 12px; padding: 3px 0; line-height: 1.4; }
+  #card .rel .who { color: var(--accent); cursor: pointer; }
+  #card .rel .ep { color: var(--muted); font-size: 10px; }
+  #card .close { position: absolute; top: 8px; right: 12px; background: none; border: none; color: var(--muted); font-size: 18px; padding: 2px 6px; }
+  #legend {
+    position: absolute; bottom: 12px; left: 12px; z-index: 7;
+    background: rgba(19,26,48,0.9); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; font-size: 11px;
+    display: grid; grid-template-columns: repeat(2, auto); gap: 3px 14px;
+  }
+  #legend .li { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+  #legend .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  #counter {
+    position: absolute; bottom: 12px; right: 12px; z-index: 7;
+    background: rgba(19,26,48,0.9); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 14px; font-size: 12px; color: var(--muted);
+    text-align: right;
+  }
+  #counter b { color: var(--accent); font-size: 16px; }
+  #toast {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    background: rgba(19,26,48,0.95); border: 1px solid var(--accent);
+    border-radius: 20px; padding: 6px 18px; font-size: 13px;
+    display: none; z-index: 10; white-space: nowrap;
+  }
+  #modal-bg {
+    position: fixed; inset: 0; background: rgba(5,8,18,0.85);
+    display: flex; align-items: center; justify-content: center; z-index: 50;
+  }
+  #modal {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 28px; width: 340px; text-align: center;
+  }
+  #modal h2 { color: var(--accent); margin-bottom: 8px; font-size: 18px; }
+  #modal p { color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 16px; }
+  #modal input {
+    background: var(--bg); border: 1px solid var(--line); color: var(--accent);
+    font-size: 26px; font-weight: 700; text-align: center;
+    border-radius: 10px; padding: 8px; width: 130px; margin-bottom: 16px;
+  }
+  #modal .note { font-size: 11px; color: var(--muted); margin-top: 12px; }
+  #results {
+    position: absolute; z-index: 20; display: none;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    max-height: 220px; overflow-y: auto; min-width: 190px;
+  }
+  #results div { padding: 6px 12px; font-size: 13px; cursor: pointer; }
+  #results div:hover { background: var(--panel2); }
+  #results .nomatch { color: var(--muted); cursor: default; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="toprow">
+    <h1>The World <span class="gold">As You Know It</span></h1>
+    <span class="sub">the One Piece world, grown only as far as you've watched</span>
+  </div>
+  <div class="controls">
+    <div class="epbox">
+      <label>Episode</label>
+      <span id="epnum">1</span>
+    </div>
+    <button id="playbtn" class="primary">▶ Play</button>
+    <div class="sliderwrap">
+      <div class="arcticks" id="arcticks"></div>
+      <input type="range" id="slider" min="1" max="589" value="1">
+    </div>
+    <input type="text" id="search" placeholder="Search a character…" autocomplete="off">
+    <button id="setep" title="Change how far you've watched">⚙ My episode</button>
+  </div>
+</header>
+
+<div id="stage">
+  <canvas id="canvas"></canvas>
+  <div id="tooltip"></div>
+  <div id="card">
+    <button class="close" id="cardclose">✕</button>
+    <h2 id="c-name"></h2>
+    <div class="epithet" id="c-epithet"></div>
+    <div class="meta" id="c-meta"></div>
+    <div class="desc" id="c-desc"></div>
+    <div class="rels"><h3>Connections you've seen</h3><div id="c-rels"></div></div>
+  </div>
+  <div id="legend"></div>
+  <div id="counter"></div>
+  <div id="toast"></div>
+  <div id="results"></div>
+</div>
+
+<div id="modal-bg">
+  <div id="modal">
+    <h2>Where are you in the story?</h2>
+    <p>Set the last episode you've watched. The world will never show you anyone or anything past it.</p>
+    <input type="number" id="myep" min="1" max="589" value="589">
+    <br>
+    <button class="primary" id="modalgo">Set sail</button>
+    <div class="note">Data currently covers up to episode 589. Saved on this device.</div>
+  </div>
+</div>
+
+<script id="opdata">
+// ---- The World As You Know It: dataset (covers episodes 1..589 only) ----
+// debut episodes are approximate; where uncertain they are biased LATER so
+// nothing ever appears before the viewer has met them.
+const DATA_MAX_EP = 589;
+
+const FACTIONS = {
+  strawhat:  { name: "Straw Hat Pirates",   color: "#ef5350" },
+  marine:    { name: "Marines",             color: "#42a5f5" },
+  warlord:   { name: "Seven Warlords",      color: "#ab47bc" },
+  whitebeard:{ name: "Whitebeard Pirates",  color: "#ffa726" },
+  blackbeard:{ name: "Blackbeard Pirates",  color: "#5d4037" },
+  revo:      { name: "Revolutionary Army",  color: "#66bb6a" },
+  baroque:   { name: "Baroque Works",       color: "#d4c04a" },
+  cp9:       { name: "CP9 / World Govt",    color: "#78909c" },
+  fishman:   { name: "Fish-Man Island",     color: "#26c6da" },
+  sky:       { name: "Skypiea",             color: "#e0e0e0" },
+  supernova: { name: "Worst Generation",    color: "#ec407a" },
+  bigmom:    { name: "Big Mom Pirates",     color: "#f06292" },
+  pirate:    { name: "Other Pirates",       color: "#8d6e63" },
+  civilian:  { name: "Civilians & Allies",  color: "#9ccc65" }
+};
+
+// [id, name, epithet, debutEp, faction, size(1-4), bounties [[ep,berries]...], blurb]
+const CHARS = [
+["luffy","Monkey D. Luffy","Straw Hat",1,"strawhat",4,[[45,30000000],[130,100000000],[320,300000000],[512,400000000]],"Rubber-bodied captain who set out from Foosha Village to become King of the Pirates."],
+["zoro","Roronoa Zoro","Pirate Hunter",2,"strawhat",3,[[130,60000000],[320,120000000]],"Three-sword-style swordsman chasing the title of world's strongest."],
+["nami","Nami","Cat Burglar",1,"strawhat",3,[[320,16000000]],"Navigator and cartographer who dreams of drawing a map of the entire world."],
+["usopp","Usopp","Sniper King",8,"strawhat",3,[[320,30000000]],"Sniper and teller of tall tales from Syrup Village, son of a Red-Hair pirate."],
+["sanji","Sanji","Black Leg",20,"strawhat",3,[[320,77000000]],"Kick-fighting cook searching for the All Blue, raised on the Baratie."],
+["chopper","Tony Tony Chopper","Cotton Candy Lover",81,"strawhat",3,[[320,50]],"Reindeer doctor who ate the Human-Human Fruit. Bounty: a devastating 50 berries."],
+["robin","Nico Robin","Devil Child",67,"strawhat",3,[[67,79000000],[320,80000000]],"Archaeologist hunted since childhood for being able to read the Poneglyphs."],
+["franky","Franky","Cyborg",233,"strawhat",3,[[322,44000000]],"Shipwright of the Thousand Sunny, powered by cola and built by his own hands."],
+["brook","Brook","Soul King",337,"strawhat",3,[[381,33000000]],"Skeleton musician kept alive by the Revive-Revive Fruit, bound by an old promise."],
+
+["roger","Gol D. Roger","Pirate King",1,"pirate",3,null,"The man who conquered the Grand Line. His execution at Loguetown started the Great Pirate Era."],
+["coby","Coby","",1,"marine",2,null,"Timid chore boy turned Marine, the first friend Luffy made at sea."],
+["helmeppo","Helmeppo","",2,"marine",1,null,"Spoiled son of a Marine captain who reformed alongside Coby."],
+["morgan","Morgan","Axe-Hand",2,"marine",1,null,"Tyrant captain of the Shells Town Marine base."],
+["alvida","Alvida","Iron Mace",1,"pirate",1,null,"The first pirate Luffy ever fought, later slick and unrecognizable."],
+["buggy","Buggy","The Clown",4,"pirate",2,[[4,15000000]],"Chop-Chop Fruit pirate with a flashy grudge and surprisingly deep history."],
+["shanks","Shanks","Red Hair",4,"pirate",4,null,"The pirate who gave Luffy his straw hat and lost an arm saving his life."],
+["kaya","Kaya","",9,"civilian",1,null,"Sickly heiress of Syrup Village and Usopp's dearest friend."],
+["kuro","Kuro","of a Hundred Plans",9,"pirate",1,[[9,16000000]],"Ex-pirate captain who posed as a butler for three years to steal a fortune."],
+["zeff","Zeff","Red Leg",20,"civilian",2,null,"Head chef of the Baratie who gave up his leg — and his dream — for Sanji."],
+["gin","Gin","Man-Demon",20,"pirate",1,null,"Krieg's commander, saved by one plate of Sanji's food."],
+["krieg","Don Krieg","Foul Play",21,"pirate",1,[[21,17000000]],"Armored fleet admiral whose armada was erased by one man in the Grand Line."],
+["mihawk","Dracule Mihawk","Hawk Eyes",23,"warlord",3,null,"The world's greatest swordsman. Zoro's distant summit."],
+["arlong","Arlong","Saw-Tooth",31,"fishman",2,[[31,20000000]],"Fish-man supremacist who held Nami's village hostage for eight years."],
+["smoker","Smoker","White Hunter",48,"marine",3,null,"Smoke-Logia Marine who has chased Luffy since Loguetown."],
+["tashigi","Tashigi","",49,"marine",2,null,"Sword-collecting Marine under Smoker who unsettles Zoro."],
+["dragon","Monkey D. Dragon","The Revolutionary",52,"revo",3,null,"The world's most wanted man, leader of the Revolutionary Army."],
+
+["laboon","Laboon","",62,"civilian",1,null,"Island whale who has waited fifty years at Reverse Mountain for a crew to return."],
+["vivi","Nefertari Vivi","",64,"civilian",3,null,"Princess of Alabasta who infiltrated Baroque Works to save her country."],
+["igaram","Igaram","",64,"civilian",1,null,"Alabasta's loyal, curler-haired captain of the guard."],
+["mr3","Galdino (Mr. 3)","",71,"baroque",1,null,"Wax-Wax artist of Baroque Works, more resourceful than he looks."],
+["dorry","Dorry","Blue Ogre",71,"pirate",1,null,"Giant of Elbaf, dueling his partner on Little Garden for a hundred years."],
+["brogy","Brogy","Red Ogre",71,"pirate",1,null,"The other half of the hundred-year duel of honor."],
+["crocodile","Crocodile","Sir Crocodile",76,"warlord",3,[[76,81000000]],"Sand-Logia Warlord who ran Baroque Works and nearly took Alabasta."],
+["mr2","Bentham (Mr. 2 Bon Kurei)","",78,"baroque",2,null,"Okama Kenpo master who chose friendship over every mission he was given."],
+["wapol","Wapol","",79,"pirate",1,null,"Gluttonous ex-king of Drum Island who fled his own people."],
+["dalton","Dalton","",79,"civilian",1,null,"Drum Island's conscience, guard captain turned leader."],
+["kureha","Kureha","Doctor Kureha",80,"civilian",1,null,"The 140-year-old witch-doctor of Drum, Chopper's teacher."],
+["hiluluk","Hiriluk","",85,"civilian",1,null,"The quack doctor who gave a monster a name and a flag. (Flashback)"],
+["ace","Portgas D. Ace","Fire Fist",94,"whitebeard",3,null,"Luffy's big brother, commander of Whitebeard's 2nd division."],
+
+["bellamy","Bellamy","The Hyena",146,"pirate",1,[[146,55000000]],"Mocked dreamers in Mock Town. Learned about dreamers the hard way."],
+["blackbeard","Marshall D. Teach","Blackbeard",146,"blackbeard",4,null,"Said people's dreams never die — then set about proving how far he'd go for his."],
+["cricket","Montblanc Cricket","",148,"civilian",1,null,"Descendant of 'liar' Noland, punching the sea for his ancestor's honor."],
+["doflamingo","Donquixote Doflamingo","Heavenly Demon",151,"warlord",3,null,"Grinning string-puller among the Seven Warlords. A new age, he says."],
+["ganfall","Gan Fall","Knight of the Sky",156,"sky",1,null,"Former God of Skypiea, now its wandering knight."],
+["wyper","Wyper","The Berserker",157,"sky",1,null,"Shandian warrior fighting to reclaim his homeland's vearth."],
+["enel","Enel","God Enel",161,"sky",2,null,"Lightning-Logia self-proclaimed god of Skypiea."],
+
+["foxy","Foxy","Silver Fox",207,"pirate",1,null,"Davy Back Fight cheat with a devastatingly slow beam."],
+["aokiji","Kuzan (Aokiji)","Blue Pheasant",226,"marine",3,null,"Ice-Logia Marine Admiral. Lazy justice, terrifying power."],
+["iceburg","Iceburg","",230,"civilian",2,null,"Mayor of Water 7 and president of Galley-La Company."],
+["paulie","Paulie","",230,"civilian",1,null,"Rope-wielding, debt-ridden Galley-La foreman with a loud sense of decency."],
+["lucci","Rob Lucci","",230,"cp9",3,null,"Strongest assassin in CP9 history. Dark justice in a top hat."],
+["kaku","Kaku","",230,"cp9",1,null,"Square-nosed shipwright-assassin with a surprising fruit."],
+["kalifa","Kalifa","",230,"cp9",1,null,"Secretary. That's sexual harassment."],
+["blueno","Blueno","",230,"cp9",1,null,"Bartender who opened doors nobody else could."],
+["spandam","Spandam","",264,"cp9",1,null,"Cowardly, cruel chief of CP9 who pulled the wrong trigger."],
+["garp","Monkey D. Garp","The Fist",313,"marine",3,null,"Marine hero who cornered Roger — and Luffy's grandfather."],
+["whitebeard","Edward Newgate","Whitebeard",316,"whitebeard",4,null,"The strongest man in the world. The closest to One Piece since Roger."],
+
+["moria","Gecko Moria","",341,"warlord",2,null,"Shadow-stealing Warlord who built an army of zombies on Thriller Bark."],
+["perona","Perona","Ghost Princess",345,"pirate",1,null,"Negative-ghost user whose hollows make the proudest warriors grovel."],
+["kuma","Bartholomew Kuma","The Tyrant",363,"warlord",3,null,"Paw-Paw Warlord who can send anything — anyone — flying for days."],
+
+["camie","Camie","",385,"fishman",1,null,"Kind mermaid who befriended the crew at Sabaody."],
+["hatchan","Hatchan","Hachi",386,"fishman",1,null,"Six-sword octopus fish-man seeking a second chance, takoyaki in hand."],
+["kid","Eustass Kid","Captain Kid",392,"supernova",2,[[392,315000000]],"Magnetic and violent rookie whose bounty outstripped Luffy's."],
+["killer","Killer","Massacre Soldier",392,"supernova",1,[[392,162000000]],"Kid's masked right hand."],
+["law","Trafalgar Law","Surgeon of Death",392,"supernova",3,[[392,200000000]],"Cool-headed rookie whose Op-Op Fruit makes the battlefield his operating room."],
+["hawkins","Basil Hawkins","The Magician",392,"supernova",1,[[392,249000000]],"Straw-and-tarot rookie who reads the odds out loud."],
+["drake","X Drake","Red Flag",392,"supernova",1,[[392,222000000]],"Ex-Marine rookie who turns into something ancient."],
+["apoo","Scratchmen Apoo","Roar of the Sea",392,"supernova",1,[[392,198000000]],"Long-armed rookie who fights in music."],
+["bonney","Jewelry Bonney","Big Eater",392,"supernova",1,[[392,140000000]],"Gluttonous rookie who toys with age itself."],
+["urouge","Urouge","Mad Monk",392,"supernova",1,[[392,108000000]],"Smiling monk from a sky island."],
+["capone","Capone Bege","Gang",392,"supernova",1,[[392,138000000]],"Mafia-style rookie with a castle where it counts."],
+["rayleigh","Silvers Rayleigh","Dark King",400,"pirate",3,null,"Right hand of the Pirate King, hiding in plain sight as a coating mechanic."],
+["shakky","Shakuyaku","Shakky",400,"civilian",1,null,"Bar owner at Sabaody who knows far more than she pours."],
+["kizaru","Borsalino (Kizaru)","Yellow Monkey",401,"marine",3,null,"Light-Logia Admiral. Have you ever been kicked at the speed of light?"],
+["sentomaru","Sentomaru","",401,"marine",1,null,"Broad-axe bodyguard of the Science Unit, tightest mouth in the Marines."],
+
+["hancock","Boa Hancock","Pirate Empress",409,"warlord",3,null,"Snake Princess of Amazon Lily. The world turns to stone for her — one boy doesn't."],
+["magellan","Magellan","",430,"marine",2,null,"Poison-bodied warden of the underwater prison Impel Down."],
+["jinbe","Jinbe","Knight of the Sea",435,"fishman",3,null,"Fish-man karate master who chose a cell over a war he despised."],
+["ivankov","Emporio Ivankov","Okama King",440,"revo",2,null,"Miracle-working Revolutionary commander, queen of Kamabakka."],
+["sengoku","Sengoku","The Buddha",457,"marine",3,null,"Fleet Admiral of the Marines through the war that shook the world."],
+["marco","Marco","The Phoenix",459,"whitebeard",2,null,"Whitebeard's first-division commander, wreathed in blue flames."],
+["akainu","Sakazuki (Akainu)","Red Dog",464,"marine",3,null,"Magma-Logia Admiral of absolute justice, whatever it costs."],
+["sabo","Sabo","",494,"revo",2,null,"The third brother, a noble runaway who sailed too early. (Flashback)"],
+["dadan","Curly Dadan","",494,"civilian",1,null,"Mountain bandit who got stuck raising the world's most dangerous children."],
+
+["neptune","Neptune","The Great Knight of the Sea",527,"fishman",2,null,"Giant king of the Ryugu Kingdom on Fish-Man Island."],
+["fukaboshi","Fukaboshi","",528,"fishman",1,null,"Neptune's eldest son, earnest prince of the three."],
+["shirahoshi","Shirahoshi","Mermaid Princess",531,"fishman",2,null,"Enormous, tearful, sheltered princess with a voice that stirs the sea."],
+["hody","Hody Jones","",526,"fishman",2,null,"New Fish-Man Pirate captain, raised on pure inherited hatred."],
+["decken","Vander Decken IX","",531,"fishman",1,null,"Mark-Mark stalker who has thrown things at one target for ten years."],
+["fishertiger","Fisher Tiger","The Adventurer",541,"fishman",2,null,"Hero of the slaves, founder of the Sun Pirates. (Flashback)"],
+["otohime","Otohime","Queen Otohime",541,"fishman",2,null,"Queen who begged her people to reach for the surface with open hands. (Flashback)"],
+["bigmom","Charlotte Linlin","Big Mom",571,"bigmom",4,null,"An Emperor of the Sea with a sweet tooth and a temper to match."],
+["pekoms","Pekoms","",571,"bigmom",1,null,"Sunglasses lion of the Big Mom Pirates."],
+["tamago","Baron Tamago","",571,"bigmom",1,null,"Long-legged egg gentleman of the Big Mom Pirates, soit."],
+
+["kinemon","Kin'emon","Foxfire",583,"civilian",2,null,"A samurai of Wano found on Punk Hazard… in installments."]
+];
+
+// [a, b, type, ep, label]  — ep is when the viewer learns of the connection
+const LINKS = [
+["zoro","luffy","crew",3,"first crewmate"],
+["nami","luffy","crew",8,"navigator"],
+["usopp","luffy","crew",17,"sniper"],
+["sanji","luffy","crew",30,"cook"],
+["chopper","luffy","crew",91,"doctor"],
+["robin","luffy","crew",130,"archaeologist"],
+["franky","luffy","crew",322,"shipwright"],
+["brook","luffy","crew",381,"musician"],
+["zoro","sanji","rival",30,"bickering rivals"],
+
+["coby","luffy","friend",1,"his first friend at sea"],
+["helmeppo","coby","friend",3,"unlikely fellow recruits"],
+["morgan","helmeppo","family",2,"father"],
+["coby","garp","mentor",314,"taken in for training"],
+["garp","luffy","family",313,"grandfather"],
+["dragon","luffy","family",314,"father — revealed by Garp"],
+["dragon","smoker","meet",53,"intervened at Loguetown"],
+["dragon","ivankov","crew",442,"his commander"],
+["kuma","dragon","ally",460,"revealed as a Revolutionary"],
+["sabo","luffy","family",494,"sworn brother"],
+["sabo","ace","family",494,"sworn brother"],
+["dadan","luffy","family",494,"foster guardian"],
+["dadan","ace","family",494,"foster guardian"],
+
+["shanks","luffy","mentor",4,"entrusted him the straw hat"],
+["shanks","buggy","rival",46,"former crewmates"],
+["shanks","roger","crew",46,"apprentice on his ship"],
+["buggy","roger","crew",46,"apprentice on his ship"],
+["shanks","mihawk","rival",24,"legendary old duels"],
+["shanks","whitebeard","meet",316,"a meeting that split the sky"],
+["blackbeard","shanks","enemy",316,"gave Shanks his scar"],
+["whitebeard","roger","rival",316,"rivals of the old era"],
+["rayleigh","roger","crew",400,"the Pirate King's right hand"],
+
+["alvida","luffy","enemy",1,"his first fight at sea"],
+["alvida","buggy","ally",46,"joined forces"],
+["buggy","luffy","enemy",5,"a flashy grudge"],
+["kuro","kaya","enemy",9,"plotted against her"],
+["kaya","usopp","friend",9,"dearest friend"],
+["krieg","luffy","enemy",25,"battle for the Baratie"],
+["krieg","mihawk","enemy",24,"fleet destroyed on sight"],
+["gin","krieg","crew",21,"battle commander"],
+["gin","sanji","friend",21,"one meal changed him"],
+["zeff","sanji","mentor",20,"saved his life, raised him"],
+["zoro","mihawk","rival",24,"swore to surpass him"],
+["zoro","mihawk","mentor",522,"trained under him"],
+["tashigi","zoro","rival",49,"a face he can't ignore"],
+["tashigi","smoker","crew",49,"his subordinate"],
+["smoker","luffy","enemy",48,"the pursuer"],
+
+["arlong","nami","enemy",31,"held her village for years"],
+["arlong","luffy","enemy",40,"the fight that freed Cocoyasi"],
+["arlong","hatchan","crew",386,"former officer"],
+["arlong","jinbe","crew",435,"brothers of the Sun Pirates"],
+["arlong","fishertiger","crew",541,"served under him"],
+
+["laboon","luffy","meet",62,"a rematch was promised"],
+["brook","laboon","friend",354,"a fifty-year promise"],
+["vivi","luffy","ally",67,"a princess among pirates"],
+["vivi","igaram","ally",64,"loyal retainer"],
+["vivi","crocodile","enemy",76,"the man breaking her country"],
+["crocodile","robin","ally",76,"partners in Baroque Works"],
+["crocodile","luffy","enemy",76,"three battles in the sand"],
+["mr3","crocodile","crew",76,"agent of Baroque Works"],
+["mr2","crocodile","crew",78,"agent of Baroque Works"],
+["mr2","luffy","friend",85,"the unlikeliest friend"],
+["mr3","dorry","enemy",73,"poisoned a duel of honor"],
+["dorry","brogy","rival",71,"a hundred-year duel"],
+["wapol","dalton","enemy",79,"tyrant and his conscience"],
+["kureha","chopper","mentor",84,"his teacher"],
+["hiluluk","chopper","family",85,"gave a monster his name"],
+["ace","luffy","family",94,"big brother"],
+["ace","whitebeard","crew",316,"2nd division commander"],
+["ace","blackbeard","enemy",325,"the hunt ended at Banaro"],
+["garp","ace","family",463,"raised him too"],
+
+["bellamy","luffy","enemy",151,"one punch"],
+["bellamy","doflamingo","crew",151,"flew his flag"],
+["cricket","luffy","friend",148,"believed in the same dream"],
+["blackbeard","luffy","rival",146,"'people's dreams never die'"],
+["blackbeard","whitebeard","enemy",483,"the betrayal"],
+["akainu","ace","enemy",483,"the fatal blow"],
+["akainu","luffy","enemy",483,"took what mattered most"],
+["whitebeard","marco","crew",459,"first-division commander"],
+["whitebeard","luffy","meet",470,"acknowledged the brat"],
+["garp","sengoku","ally",457,"old comrades of the last era"],
+
+["ganfall","enel","enemy",161,"the god he was usurped by"],
+["enel","wyper","enemy",161,"war for the vearth"],
+["enel","luffy","enemy",178,"lightning meets rubber"],
+["foxy","luffy","rival",208,"the Davy Back Fight"],
+
+["aokiji","luffy","enemy",226,"first brush with an Admiral"],
+["aokiji","robin","meet",227,"a ghost from her past"],
+["lucci","luffy","enemy",272,"his fiercest duel yet"],
+["lucci","kaku","crew",272,"CP9"],
+["lucci","kalifa","crew",272,"CP9"],
+["lucci","blueno","crew",272,"CP9"],
+["spandam","lucci","crew",272,"chief of CP9"],
+["robin","lucci","enemy",264,"her captors"],
+["iceburg","franky","family",259,"Tom's two apprentices"],
+["iceburg","paulie","crew",230,"Galley-La foreman"],
+
+["moria","luffy","enemy",343,"lord of Thriller Bark"],
+["moria","brook","enemy",341,"stole his shadow"],
+["perona","moria","crew",345,"his ghost mistress"],
+["perona","zoro","friend",522,"reluctant caretaker"],
+["kuma","luffy","enemy",405,"scattered the whole crew"],
+["kuma","zoro","meet",377,"an unexplained mercy"],
+
+["camie","luffy","friend",385,"a mermaid's gratitude"],
+["camie","hatchan","friend",386,"her protector"],
+["rayleigh","shakky","ally",400,"partners"],
+["rayleigh","luffy","mentor",516,"two years of training"],
+["kid","luffy","rival",396,"the auction house standoff"],
+["law","luffy","rival",396,"the auction house standoff"],
+["law","luffy","ally",490,"saved his life after the war"],
+["kid","killer","crew",392,"right hand"],
+["kizaru","luffy","enemy",401,"too fast to even see"],
+["kizaru","sentomaru","ally",401,"escort of the Science Unit"],
+
+["hancock","luffy","ally",413,"smitten protector"],
+["magellan","luffy","enemy",433,"the poison warden"],
+["ivankov","luffy","ally",440,"savior in Impel Down"],
+["jinbe","luffy","ally",451,"held him together"],
+["sengoku","luffy","enemy",467,"the war at Marineford"],
+
+["neptune","otohime","family",541,"his late queen"],
+["neptune","shirahoshi","family",531,"daughter"],
+["neptune","fukaboshi","family",528,"eldest son"],
+["shirahoshi","luffy","friend",533,"a crybaby and her bodyguard"],
+["decken","shirahoshi","enemy",531,"ten years of thrown letters"],
+["hody","decken","ally",532,"an alliance of grudges"],
+["hody","neptune","enemy",543,"coup against the palace"],
+["hody","luffy","enemy",545,"the New Fish-Man Pirates"],
+["jinbe","neptune","ally",540,"trusted by the palace"],
+["fishertiger","otohime","meet",541,"two answers to one wound"],
+["fishertiger","jinbe","crew",541,"his captain"],
+["bigmom","luffy","enemy",573,"he declared war on an Emperor"],
+["bigmom","neptune","ally",571,"protection, for candy"],
+["bigmom","pekoms","crew",571,"crewman"],
+["bigmom","tamago","crew",571,"crewman"],
+
+["law","smoker","enemy",584,"clash at Punk Hazard"],
+["kinemon","luffy","meet",584,"a samurai, in pieces"]
+];
+
+const ARCS = [
+[1,"East Blue"],[62,"Alabasta"],[136,"Skypiea"],[207,"Water 7"],
+[326,"Thriller Bark"],[385,"War Saga"],[517,"Fish-Man I."],[575,"New World"]
+];
+
+const LINKCOLORS = {
+  crew:"#f5c542", family:"#66bb6a", ally:"#4fc3f7", friend:"#9ccc65",
+  mentor:"#ba68c8", rival:"#ff8a65", enemy:"#ef5350", meet:"#607094"
+};
+</script>
+
+<script>
+// ---------------- state ----------------
+const byId = {};
+CHARS.forEach(c => byId[c[0]] = {
+  id:c[0], name:c[1], epithet:c[2], debut:c[3], faction:c[4], size:c[5],
+  bounties:c[6], blurb:c[7], x:0, y:0, vx:0, vy:0, placed:false, born:0
+});
+const NODES = Object.values(byId);
+const EDGES = LINKS.map(l => ({a:byId[l[0]], b:byId[l[1]], type:l[2], ep:l[3], label:l[4]}));
+
+let myEp = parseInt(localStorage.getItem("opw_myep") || "0", 10);
+let ep = parseInt(localStorage.getItem("opw_slider") || "1", 10);
+let playing = false;
+let selected = null;
+let hovered = null;
+let cam = {x:0, y:0, z:1};
+let lastCount = 0;
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const slider = document.getElementById("slider");
+const epnum = document.getElementById("epnum");
+const tooltip = document.getElementById("tooltip");
+
+// deterministic pseudo-random from id so layout is stable across loads
+function hashf(s, salt) {
+  let h = 2166136261 ^ salt;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return ((h >>> 0) % 10000) / 10000;
+}
+
+function seedNode(n) {
+  // spawn near an already-visible connection if one exists, else on a spiral by debut
+  const anchor = EDGES.find(e => e.ep <= ep &&
+    ((e.a === n && e.b.placed) || (e.b === n && e.a.placed)));
+  if (anchor) {
+    const other = anchor.a === n ? anchor.b : anchor.a;
+    n.x = other.x + (hashf(n.id,1) - 0.5) * 120;
+    n.y = other.y + (hashf(n.id,2) - 0.5) * 120;
+  } else {
+    const t = n.debut * 0.045 + hashf(n.id,3) * 6.28;
+    const r = 140 + n.debut * 0.55;
+    n.x = Math.cos(t) * r;
+    n.y = Math.sin(t) * r;
+  }
+  n.vx = n.vy = 0;
+  n.placed = true;
+  n.born = performance.now();
+}
+
+function visibleNodes() { return NODES.filter(n => n.debut <= ep); }
+function visibleEdges() { return EDGES.filter(e => e.ep <= ep); }
+
+function syncPlacement() {
+  const vis = visibleNodes();
+  vis.forEach(n => { if (!n.placed) seedNode(n); });
+  NODES.forEach(n => { if (n.debut > ep) n.placed = false; });
+  if (vis.length !== lastCount) lastCount = vis.length;
+}
+
+// ---------------- physics ----------------
+function tick() {
+  const vis = NODES.filter(n => n.placed);
+  const edges = visibleEdges();
+  // repulsion
+  for (let i = 0; i < vis.length; i++) {
+    for (let j = i + 1; j < vis.length; j++) {
+      const a = vis[i], b = vis[j];
+      let dx = b.x - a.x, dy = b.y - a.y;
+      let d2 = dx*dx + dy*dy;
+      if (d2 < 1) { dx = hashf(a.id,4) - 0.5; dy = hashf(b.id,5) - 0.5; d2 = 1; }
+      if (d2 > 160000) continue;
+      const f = 1400 / d2;
+      const d = Math.sqrt(d2);
+      const fx = dx / d * f, fy = dy / d * f;
+      a.vx -= fx; a.vy -= fy; b.vx += fx; b.vy += fy;
+    }
+  }
+  // springs
+  edges.forEach(e => {
+    if (!e.a.placed || !e.b.placed) return;
+    const dx = e.b.x - e.a.x, dy = e.b.y - e.a.y;
+    const d = Math.sqrt(dx*dx + dy*dy) || 1;
+    const rest = 90 + (e.a.size + e.b.size) * 8;
+    const f = (d - rest) * 0.004;
+    const fx = dx / d * f, fy = dy / d * f;
+    e.a.vx += fx; e.a.vy += fy; e.b.vx -= fx; e.b.vy -= fy;
+  });
+  // gravity to center + integrate
+  vis.forEach(n => {
+    n.vx -= n.x * 0.0012; n.vy -= n.y * 0.0012;
+    n.vx *= 0.86; n.vy *= 0.86;
+    n.x += n.vx; n.y += n.vy;
+  });
+}
+
+// ---------------- render ----------------
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  const r = canvas.getBoundingClientRect();
+  canvas.width = r.width * dpr;
+  canvas.height = r.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener("resize", resize);
+
+function worldToScreen(x, y) {
+  const r = canvas.getBoundingClientRect();
+  return [r.width/2 + (x - cam.x) * cam.z, r.height/2 + (y - cam.y) * cam.z];
+}
+function screenToWorld(px, py) {
+  const r = canvas.getBoundingClientRect();
+  return [(px - r.width/2) / cam.z + cam.x, (py - r.height/2) / cam.z + cam.y];
+}
+function nodeR(n) { return (6 + n.size * 3.2); }
+
+function draw() {
+  const r = canvas.getBoundingClientRect();
+  ctx.clearRect(0, 0, r.width, r.height);
+  const now = performance.now();
+  const edges = visibleEdges();
+  const conn = selected ? new Set(edges.filter(e => e.a === selected || e.b === selected)
+    .flatMap(e => [e.a.id, e.b.id])) : null;
+
+  edges.forEach(e => {
+    if (!e.a.placed || !e.b.placed) return;
+    const [x1, y1] = worldToScreen(e.a.x, e.a.y);
+    const [x2, y2] = worldToScreen(e.b.x, e.b.y);
+    const dim = selected && e.a !== selected && e.b !== selected;
+    ctx.strokeStyle = LINKCOLORS[e.type] || "#607094";
+    ctx.globalAlpha = dim ? 0.06 : (e.type === "meet" ? 0.25 : 0.42);
+    ctx.lineWidth = e.type === "crew" ? 1.8 : 1.1;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+
+  NODES.filter(n => n.placed).forEach(n => {
+    const [x, y] = worldToScreen(n.x, n.y);
+    const rad = nodeR(n) * cam.z;
+    const age = now - n.born;
+    const flash = age < 1200 ? (1 - age / 1200) : 0;
+    const dim = selected && n !== selected && !(conn && conn.has(n.id));
+    const col = FACTIONS[n.faction].color;
+
+    if (flash > 0) {
+      ctx.beginPath();
+      ctx.arc(x, y, rad + 14 * flash, 0, 6.29);
+      ctx.strokeStyle = "#f5c542";
+      ctx.globalAlpha = flash * 0.8;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.beginPath();
+    ctx.arc(x, y, rad, 0, 6.29);
+    ctx.fillStyle = col;
+    ctx.globalAlpha = dim ? 0.15 : 1;
+    ctx.fill();
+    if (n === selected || n === hovered) {
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
+    }
+    // labels: big names always, others when zoomed or highlighted
+    if (!dim && (n.size >= 3 || cam.z > 1.25 || n === hovered || n === selected || flash > 0)) {
+      ctx.fillStyle = dim ? "rgba(232,236,248,0.2)" : "rgba(232,236,248,0.92)";
+      ctx.font = `${n.size >= 3 ? "600 " : ""}${Math.max(10, 11 * Math.min(cam.z, 1.4))}px -apple-system, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText(n.name, x, y + rad + 13);
+    }
+    ctx.globalAlpha = 1;
+  });
+}
+
+function frame() {
+  syncPlacement();
+  tick(); tick();
+  draw();
+  if (playing) {
+    playFrames++;
+    if (playFrames % 4 === 0) setEpisode(Math.min(ep + 1, myEp));
+    if (ep >= myEp) setPlaying(false);
+  }
+  requestAnimationFrame(frame);
+}
+let playFrames = 0;
+
+// ---------------- controls ----------------
+function setEpisode(v, fromSlider) {
+  ep = Math.max(1, Math.min(v, myEp));
+  if (!fromSlider) slider.value = ep;
+  epnum.textContent = ep;
+  localStorage.setItem("opw_slider", ep);
+  updateCounter();
+  if (selected && selected.debut > ep) closeCard();
+  if (selected) openCard(selected); // refresh bounty/relations for new ep
+}
+function updateCounter() {
+  const n = visibleNodes().length, e = visibleEdges().length;
+  document.getElementById("counter").innerHTML =
+    `<b>${n}</b> characters met<br>${e} connections known`;
+}
+function setPlaying(on) {
+  playing = on;
+  document.getElementById("playbtn").textContent = on ? "❚❚ Pause" : "▶ Play";
+  if (on && ep >= myEp) setEpisode(1);
+}
+document.getElementById("playbtn").onclick = () => setPlaying(!playing);
+slider.addEventListener("input", () => { setPlaying(false); setEpisode(parseInt(slider.value,10), true); });
+
+function applyMyEp(v) {
+  myEp = Math.max(1, Math.min(v || DATA_MAX_EP, DATA_MAX_EP));
+  localStorage.setItem("opw_myep", myEp);
+  slider.max = myEp;
+  if (ep > myEp) setEpisode(myEp);
+  buildArcTicks();
+}
+document.getElementById("modalgo").onclick = () => {
+  applyMyEp(parseInt(document.getElementById("myep").value, 10));
+  document.getElementById("modal-bg").style.display = "none";
+  setEpisode(myEp);
+  toast(`The world as of episode ${myEp}. Drag the timeline to travel back.`);
+};
+document.getElementById("setep").onclick = () => {
+  document.getElementById("myep").value = myEp;
+  document.getElementById("modal-bg").style.display = "flex";
+};
+
+function buildArcTicks() {
+  const el = document.getElementById("arcticks");
+  el.innerHTML = "";
+  ARCS.forEach(([e, name]) => {
+    if (e > myEp) return;
+    const s = document.createElement("span");
+    s.textContent = name;
+    s.style.left = ((e - 1) / Math.max(myEp - 1, 1) * 100) + "%";
+    el.appendChild(s);
+  });
+}
+
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.style.display = "block";
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.style.display = "none", 3500);
+}
+
+// ---------------- card ----------------
+function fmtBounty(v) {
+  if (v < 1000) return v + " berries";
+  return v.toLocaleString("en-US") + " berries";
+}
+function openCard(n) {
+  selected = n;
+  document.getElementById("c-name").textContent = n.name;
+  document.getElementById("c-epithet").textContent = n.epithet ? `“${n.epithet}”` : "";
+  let bounty = null;
+  if (n.bounties) n.bounties.forEach(([be, bv]) => { if (be <= ep) bounty = bv; });
+  document.getElementById("c-meta").innerHTML =
+    `<b>${FACTIONS[n.faction].name}</b><br>` +
+    `First seen: episode <b>${n.debut}</b><br>` +
+    (bounty !== null ? `Bounty (as of ep ${ep}): <b>${fmtBounty(bounty)}</b>` : `Bounty: <span style="opacity:.6">none known yet</span>`);
+  document.getElementById("c-desc").textContent = n.blurb;
+  const rels = visibleEdges().filter(e => e.a === n || e.b === n)
+    .sort((x, y) => x.ep - y.ep);
+  document.getElementById("c-rels").innerHTML = rels.length
+    ? rels.map(e => {
+        const other = e.a === n ? e.b : e.a;
+        return `<div class="rel"><span class="who" data-id="${other.id}">${other.name}</span>` +
+          ` — ${e.label} <span class="ep">(ep ${e.ep})</span></div>`;
+      }).join("")
+    : `<div class="rel" style="color:var(--muted)">No connections known yet.</div>`;
+  document.getElementById("card").style.display = "block";
+  document.querySelectorAll("#c-rels .who").forEach(el => {
+    el.onclick = () => { const t = byId[el.dataset.id]; if (t && t.debut <= ep) { openCard(t); focusNode(t); } };
+  });
+}
+function closeCard() { selected = null; document.getElementById("card").style.display = "none"; }
+document.getElementById("cardclose").onclick = closeCard;
+
+function focusNode(n) {
+  cam.x = n.x; cam.y = n.y;
+  if (cam.z < 1.2) cam.z = 1.2;
+}
+
+// ---------------- search (partial, case-insensitive) ----------------
+const searchEl = document.getElementById("search");
+const resultsEl = document.getElementById("results");
+function runSearch() {
+  const q = searchEl.value.trim().toLowerCase();
+  if (!q) { resultsEl.style.display = "none"; return; }
+  const hits = visibleNodes().filter(n =>
+    n.name.toLowerCase().includes(q) || (n.epithet && n.epithet.toLowerCase().includes(q))
+  ).slice(0, 12);
+  const hidden = NODES.filter(n => n.debut > ep &&
+    (n.name.toLowerCase().includes(q) || (n.epithet && n.epithet.toLowerCase().includes(q)))).length;
+  resultsEl.innerHTML = hits.map(n =>
+    `<div data-id="${n.id}">${n.name}${n.epithet ? ` <span style="color:var(--muted);font-size:11px">“${n.epithet}”</span>` : ""}</div>`
+  ).join("") +
+  (hits.length === 0 ? `<div class="nomatch">No one you've met matches that.</div>` : "") +
+  (hidden > 0 ? `<div class="nomatch">🔒 ${hidden} more exist${hidden===1?"s":""} beyond episode ${ep}…</div>` : "");
+  const r = searchEl.getBoundingClientRect();
+  const stage = document.getElementById("stage").getBoundingClientRect();
+  resultsEl.style.left = (r.left - stage.left) + "px";
+  resultsEl.style.top = "4px";
+  resultsEl.style.display = "block";
+  resultsEl.querySelectorAll("div[data-id]").forEach(el => {
+    el.onclick = () => {
+      const n = byId[el.dataset.id];
+      resultsEl.style.display = "none"; searchEl.value = "";
+      openCard(n); focusNode(n);
+    };
+  });
+}
+searchEl.addEventListener("input", runSearch);
+searchEl.addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    const first = resultsEl.querySelector("div[data-id]");
+    if (first) first.click();
+  }
+  if (e.key === "Escape") { resultsEl.style.display = "none"; searchEl.blur(); }
+});
+document.addEventListener("click", e => {
+  if (!resultsEl.contains(e.target) && e.target !== searchEl) resultsEl.style.display = "none";
+});
+
+// ---------------- pointer ----------------
+let dragging = false, dragMoved = false, lastP = null;
+function pickNode(px, py) {
+  const [wx, wy] = screenToWorld(px, py);
+  let best = null, bd = 1e9;
+  NODES.filter(n => n.placed).forEach(n => {
+    const dx = n.x - wx, dy = n.y - wy;
+    const d = Math.sqrt(dx*dx + dy*dy);
+    if (d < nodeR(n) / Math.min(cam.z,1) + 6 && d < bd) { bd = d; best = n; }
+  });
+  return best;
+}
+canvas.addEventListener("mousedown", e => {
+  dragging = true; dragMoved = false;
+  lastP = [e.offsetX, e.offsetY];
+  canvas.classList.add("dragging");
+});
+window.addEventListener("mouseup", () => { dragging = false; canvas.classList.remove("dragging"); });
+canvas.addEventListener("mousemove", e => {
+  if (dragging) {
+    const dx = e.offsetX - lastP[0], dy = e.offsetY - lastP[1];
+    if (Math.abs(dx) + Math.abs(dy) > 2) dragMoved = true;
+    cam.x -= dx / cam.z; cam.y -= dy / cam.z;
+    lastP = [e.offsetX, e.offsetY];
+    return;
+  }
+  hovered = pickNode(e.offsetX, e.offsetY);
+  if (hovered) {
+    tooltip.style.display = "block";
+    tooltip.style.left = (e.offsetX + 14) + "px";
+    tooltip.style.top = (e.offsetY + 10) + "px";
+    tooltip.innerHTML = `<span class="tt-name">${hovered.name}</span>` +
+      (hovered.epithet ? ` <span style="color:var(--muted)">“${hovered.epithet}”</span>` : "") +
+      `<br><span style="color:var(--muted)">first seen ep ${hovered.debut} · click for details</span>`;
+    canvas.style.cursor = "pointer";
+  } else {
+    tooltip.style.display = "none";
+    canvas.style.cursor = dragging ? "grabbing" : "grab";
+  }
+});
+canvas.addEventListener("click", e => {
+  if (dragMoved) return;
+  const n = pickNode(e.offsetX, e.offsetY);
+  if (n) { openCard(n); } else { closeCard(); }
+});
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  const f = e.deltaY < 0 ? 1.1 : 0.9;
+  cam.z = Math.max(0.3, Math.min(3.5, cam.z * f));
+}, { passive: false });
+
+// touch: one-finger pan, tap to select
+let touchStart = null;
+canvas.addEventListener("touchstart", e => {
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    const r = canvas.getBoundingClientRect();
+    touchStart = lastP = [t.clientX - r.left, t.clientY - r.top];
+    dragMoved = false;
+  }
+}, { passive: true });
+canvas.addEventListener("touchmove", e => {
+  if (e.touches.length === 1 && lastP) {
+    const t = e.touches[0];
+    const r = canvas.getBoundingClientRect();
+    const p = [t.clientX - r.left, t.clientY - r.top];
+    cam.x -= (p[0] - lastP[0]) / cam.z; cam.y -= (p[1] - lastP[1]) / cam.z;
+    if (Math.abs(p[0]-touchStart[0]) + Math.abs(p[1]-touchStart[1]) > 6) dragMoved = true;
+    lastP = p;
+  }
+}, { passive: true });
+canvas.addEventListener("touchend", () => {
+  if (!dragMoved && touchStart) {
+    const n = pickNode(touchStart[0], touchStart[1]);
+    if (n) openCard(n); else closeCard();
+  }
+  lastP = touchStart = null;
+});
+
+// ---------------- legend ----------------
+(function () {
+  const el = document.getElementById("legend");
+  Object.values(FACTIONS).forEach(f => {
+    const d = document.createElement("div");
+    d.className = "li";
+    d.innerHTML = `<span class="dot" style="background:${f.color}"></span>${f.name}`;
+    el.appendChild(d);
+  });
+})();
+
+// ---------------- boot ----------------
+resize();
+if (myEp >= 1) {
+  document.getElementById("modal-bg").style.display = "none";
+  applyMyEp(myEp);
+  setEpisode(Math.min(ep, myEp));
+} else {
+  // first run: modal stays open; a sane default underneath (persisted on confirm)
+  myEp = DATA_MAX_EP;
+  slider.max = myEp;
+  setEpisode(1);
+  buildArcTicks();
+  window.addEventListener("keydown", function once(e) {
+    if (e.key === "Enter" && document.getElementById("modal-bg").style.display !== "none") {
+      document.getElementById("modalgo").click();
+      window.removeEventListener("keydown", once);
+    }
+  });
+}
+updateCounter();
+frame();
+</script>
+</body>
+</html>
