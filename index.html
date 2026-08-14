@@ -134,6 +134,50 @@
     border-radius: 20px; padding: 6px 18px; font-size: 13px;
     display: none; z-index: 10; white-space: nowrap;
   }
+  #lab-bg {
+    position: fixed; inset: 0; background: rgba(5,8,18,0.88);
+    display: none; align-items: center; justify-content: center; z-index: 60;
+  }
+  #lab {
+    position: relative; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 22px; width: min(680px, calc(100vw - 24px));
+    max-height: calc(100vh - 60px); overflow-y: auto;
+  }
+  #lab h2 { color: var(--accent); font-size: 18px; }
+  #lab .labsub { color: var(--muted); font-size: 12px; margin: 4px 0 12px; }
+  #lab .labhint { color: var(--muted); font-size: 12px; margin: 8px 0; }
+  .labrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
+  #lab-char {
+    background: var(--bg); border: 1px solid var(--line); color: var(--ink);
+    border-radius: 8px; padding: 7px 10px; font-size: 13px; max-width: 220px;
+  }
+  #lab-line { font-style: italic; color: #f0d98c; font-size: 12px; flex: 1; min-width: 160px; }
+  .labtabs { display: flex; gap: 6px; margin: 12px 0 4px; border-bottom: 1px solid var(--line); }
+  .labtab { border: none; background: none; color: var(--muted); font-size: 12px; padding: 8px 10px; border-radius: 0; }
+  .labtab.on { color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+  #voicegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+  .vcell {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 9px; font-size: 12px; cursor: pointer;
+  }
+  .vcell:hover { border-color: var(--accent); }
+  .vcell.on { border-color: var(--accent); color: var(--accent); }
+  .vcell.cur { box-shadow: inset 0 0 0 1px var(--accent); }
+  .vcell .vd { color: var(--muted); font-size: 10px; }
+  .vcell .star { font-size: 13px; opacity: 0.35; }
+  .vcell .star:hover, .vcell.cur .star { opacity: 1; }
+  #eldesc, #elkey {
+    width: 100%; background: var(--bg); border: 1px solid var(--line); color: var(--ink);
+    border-radius: 8px; padding: 9px 11px; font-size: 13px; margin: 6px 0;
+    font-family: inherit; line-height: 1.5; resize: vertical;
+  }
+  #elstatus { font-size: 12px; color: var(--muted); }
+  #elpreviews { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  #elpreviews .elp {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px; font-size: 12px;
+  }
   #modal-bg {
     position: fixed; inset: 0; background: rgba(5,8,18,0.85);
     display: flex; align-items: center; justify-content: center; z-index: 50;
@@ -189,6 +233,7 @@
     <button id="playbtn" class="primary">▶ Play</button>
     <button id="soundbtn" title="Toggle sound">🔊</button>
     <button id="dialoguebtn" title="Dialogue mode: cards speak their famous line">💬</button>
+    <button id="labbtn" title="Voice lab: design and pick each character's voice">🎤</button>
     <div class="sliderwrap">
       <div class="arcticks" id="arcticks"></div>
       <input type="range" id="slider" min="1" max="589" value="1">
@@ -217,6 +262,36 @@
   <div id="counter"></div>
   <div id="toast"></div>
   <div id="results"></div>
+</div>
+
+<div id="lab-bg">
+  <div id="lab">
+    <button class="close" id="labclose">✕</button>
+    <h2>🎤 Voice Lab</h2>
+    <p class="labsub">Find a voice you actually like. Picks are saved on this device, per character.</p>
+    <div class="labrow">
+      <select id="lab-char"></select>
+      <span id="lab-line"></span>
+    </div>
+    <div class="labtabs">
+      <button class="labtab on" data-tab="gem">Gemini · 30 stock voices</button>
+      <button class="labtab" data-tab="el">Design a voice from scratch</button>
+    </div>
+    <div id="tab-gem" class="labpane">
+      <p class="labhint">Tap any voice to hear this character's line. ★ locks it in.</p>
+      <div id="voicegrid"></div>
+    </div>
+    <div id="tab-el" class="labpane" style="display:none">
+      <p class="labhint">Describe the voice in your own words — ElevenLabs builds a brand-new voice from it, not a stock one. Needs a free ElevenLabs key.</p>
+      <input type="password" id="elkey" placeholder="ElevenLabs API key (elevenlabs.io → profile → API key)" autocomplete="off">
+      <textarea id="eldesc" rows="4"></textarea>
+      <div class="labrow">
+        <button class="primary" id="eldesign">🎨 Design 3 voices</button>
+        <span id="elstatus"></span>
+      </div>
+      <div id="elpreviews"></div>
+    </div>
+  </div>
 </div>
 
 <div id="modal-bg">
@@ -1067,6 +1142,137 @@ function keepAudition(n) {
   toast(`${n.name} is now voiced by ${auditionVoice} on this device.`);
   document.getElementById("c-audit").style.display = "none";
 }
+// ---------------- voice lab ----------------
+let labChar = null;
+function labQuoteFor(n) { const q = QUOTES[n.id]; return q && q[0] <= ep ? q : null; }
+function openLab(n) {
+  const sel = document.getElementById("lab-char");
+  const opts = visibleNodes().filter(c => labQuoteFor(c)).sort((a, b) => a.name.localeCompare(b.name));
+  sel.innerHTML = opts.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+  labChar = (n && labQuoteFor(n)) ? n : opts[0];
+  if (!labChar) { toast("No spoken lines unlocked yet at this episode."); return; }
+  sel.value = labChar.id;
+  document.getElementById("elkey").value = EL.key();
+  syncLab();
+  document.getElementById("lab-bg").style.display = "flex";
+}
+function syncLab() {
+  const n = labChar;
+  const q = labQuoteFor(n);
+  document.getElementById("lab-line").textContent = q ? `“${q[1]}”` : "";
+  document.getElementById("eldesc").value = personaFor(n);
+  const curGem = castFor(n)[0];
+  const elv = EL.voices()[n.id];
+  document.getElementById("voicegrid").innerHTML = ALL_VOICES.map(([v, d]) =>
+    `<div class="vcell${v === curGem && !elv ? " cur" : ""}" data-v="${v}">
+       <span>${v}<span class="vd"> · ${d}</span></span><span class="star">★</span>
+     </div>`).join("");
+  document.querySelectorAll("#voicegrid .vcell").forEach(c => {
+    c.onclick = e => {
+      const v = c.dataset.v;
+      if (e.target.classList.contains("star")) {
+        let ov = {};
+        try { ov = JSON.parse(localStorage.getItem("opw_cast_override") || "{}"); } catch (er) {}
+        ov[n.id] = [v, castFor(n)[1]];
+        localStorage.setItem("opw_cast_override", JSON.stringify(ov));
+        const els = EL.voices(); delete els[n.id];
+        localStorage.setItem("opw_el_voice", JSON.stringify(els));
+        toast(`${n.name} now speaks with ${v}.`);
+        syncLab();
+      } else {
+        labPlayGemini(n, v, c);
+      }
+    };
+  });
+  document.getElementById("elpreviews").innerHTML = elv
+    ? `<div class="elp"><span>✓ using your designed voice “${elv.name}”</span><button id="el-clear">remove</button></div>` : "";
+  const clr = document.getElementById("el-clear");
+  if (clr) clr.onclick = () => {
+    const els = EL.voices(); delete els[n.id];
+    localStorage.setItem("opw_el_voice", JSON.stringify(els));
+    toast(`${n.name} reverted to a stock voice.`);
+    syncLab();
+  };
+}
+async function labPlayGemini(n, v, cell) {
+  const key = localStorage.getItem("opw_gemini_key");
+  const q = labQuoteFor(n);
+  if (!key) { toast("Add a Gemini key in ⚙ My episode to hear these."); return; }
+  document.querySelectorAll("#voicegrid .vcell").forEach(c => c.classList.remove("on"));
+  cell.classList.add("on");
+  const label = cell.querySelector("span");
+  const orig = label.innerHTML;
+  label.textContent = v + " …";
+  try {
+    const ck = "aud:" + n.id + ":" + v;
+    let b64 = await vget(ck);
+    if (!b64) { b64 = await ttsFetch(key, v, castFor(n)[1], q[1]); vput(ck, b64); }
+    playPcm(b64);
+  } catch (e) {
+    toast(/quota|429/.test(String(e.message || e))
+      ? "Gemini's free voice quota is used up for now — try again later, or design a voice instead."
+      : "Could not generate that voice.");
+  }
+  label.innerHTML = orig;
+}
+document.getElementById("labbtn").onclick = () => { ac(); openLab(selected); };
+document.getElementById("labclose").onclick = () => {
+  document.getElementById("lab-bg").style.display = "none";
+  stopVoice();
+};
+document.getElementById("lab-char").onchange = e => { labChar = byId[e.target.value]; stopVoice(); syncLab(); };
+document.querySelectorAll(".labtab").forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll(".labtab").forEach(x => x.classList.remove("on"));
+    t.classList.add("on");
+    document.getElementById("tab-gem").style.display = t.dataset.tab === "gem" ? "block" : "none";
+    document.getElementById("tab-el").style.display = t.dataset.tab === "el" ? "block" : "none";
+  };
+});
+document.getElementById("elkey").onchange = e => {
+  const k = e.target.value.trim();
+  if (k) localStorage.setItem("opw_el_key", k); else localStorage.removeItem("opw_el_key");
+};
+document.getElementById("eldesign").onclick = async () => {
+  const n = labChar, st = document.getElementById("elstatus");
+  const desc = document.getElementById("eldesc").value.trim();
+  const k = document.getElementById("elkey").value.trim();
+  if (k) localStorage.setItem("opw_el_key", k);
+  if (!EL.key()) { st.textContent = "add your ElevenLabs key first"; return; }
+  if (desc.length < 20) { st.textContent = "describe the voice a bit more (20+ characters)"; return; }
+  st.textContent = "designing three voices…";
+  try {
+    const previews = await EL.design(desc);
+    st.textContent = previews.length + " voices ready — play each, then keep one";
+    const box = document.getElementById("elpreviews");
+    box.innerHTML = previews.map((p, i) =>
+      `<div class="elp"><span>Take ${i + 1} · ${Math.round(p.duration_secs || 0)}s</span>
+        <span><button data-play="${i}">▶ play</button> <button class="primary" data-keep="${i}">✓ keep</button></span></div>`).join("");
+    box.querySelectorAll("[data-play]").forEach(b => {
+      b.onclick = () => playB64Audio(previews[+b.dataset.play].audio_base_64, previews[+b.dataset.play].media_type || "audio/mpeg");
+    });
+    box.querySelectorAll("[data-keep]").forEach(b => {
+      b.onclick = async () => {
+        const p = previews[+b.dataset.keep];
+        b.textContent = "saving…";
+        try {
+          const name = `OPW ${n.name}`.slice(0, 40);
+          const vid = await EL.create(name, desc, p.generated_voice_id);
+          EL.setVoice(n.id, { voice_id: vid, name });
+          st.textContent = "";
+          toast(`${n.name} now speaks with your designed voice.`);
+          syncLab();
+        } catch (e) {
+          b.textContent = "✓ keep";
+          st.textContent = String(e.message || e) + " — free plans allow only a few saved voices; remove one at elevenlabs.io";
+        }
+      };
+    });
+  } catch (e) {
+    st.textContent = String(e.message || e);
+  }
+};
+
 function buildAudition(n) {
   const el = document.getElementById("c-audit");
   auditionVoice = null;
@@ -1099,11 +1305,110 @@ function vput(k, val) {
     t.onsuccess = () => res(); t.onerror = () => res();
   })).catch(() => {});
 }
+// all 30 Gemini stock voices with Google's own descriptors
+const ALL_VOICES = [
+["Zephyr","Bright"],["Puck","Upbeat"],["Charon","Informative"],["Kore","Firm"],
+["Fenrir","Excitable"],["Leda","Youthful"],["Orus","Firm"],["Aoede","Breezy"],
+["Callirrhoe","Easy-going"],["Autonoe","Bright"],["Enceladus","Breathy"],["Iapetus","Clear"],
+["Umbriel","Easy-going"],["Algieba","Smooth"],["Despina","Smooth"],["Erinome","Clear"],
+["Algenib","Gravelly"],["Rasalgethi","Informative"],["Laomedeia","Upbeat"],["Achernar","Soft"],
+["Alnilam","Firm"],["Schedar","Even"],["Gacrux","Mature"],["Pulcherrima","Forward"],
+["Achird","Friendly"],["Zubenelgenubi","Casual"],["Vindemiatrix","Gentle"],["Sadachbia","Lively"],
+["Sadaltager","Knowledgeable"],["Sulafat","Warm"]
+];
+// starting descriptions for designing a voice from scratch (editable in the lab)
+const PERSONA = {
+luffy:"A raspy, boyish 17-year-old boy. Bright, loud, endlessly cheerful and reckless, like a cartoon adventure hero who never stops grinning. Slightly scratchy throat, big open vowels, always sounds like he is about to laugh or shout.",
+zoro:"A deep, gruff young man in his early twenties. Flat, blunt, gravel under the tone, speaks slowly and never raises his voice. Sounds permanently unimpressed and dangerous.",
+nami:"A young woman in her late teens, bright and sharp with a slightly nasal edge, quick and bossy, but cracks into raw emotion when she stops pretending to be tough.",
+usopp:"A scrawny teenage boy with a nasal, jittery voice that races when he is bragging and squeaks when he is scared. Fast, theatrical, wildly overconfident.",
+sanji:"A smooth young man in his early twenties with a low, warm, cigarette-roughened voice, cool and flirtatious, with a sharp bite when he is angry.",
+chopper:"A tiny child-like creature, very high squeaky voice, innocent and breathless with excitement, half sob half giggle.",
+robin:"A calm woman in her late twenties, low soft velvet voice, unhurried and mysterious, with quiet sadness under every word.",
+franky:"A huge boisterous man, loud and brassy, gravel-throated, over-the-top showman energy, shouts everything with delight.",
+brook:"An elderly gentleman skeleton with a hollow, theatrical, slightly echoing voice, absurdly polite, prone to bone-dry laughter.",
+whitebeard:"An enormous ancient warrior in his seventies, cavernous bass voice, slow and thunderous, weathered and cracked, immense weight behind every syllable.",
+shanks:"A relaxed man in his late thirties, warm and easy with a rough edge, friendly and unbothered until a sudden quiet steel enters his tone.",
+blackbeard:"A large slovenly man, booming greasy laugh, chaotic and jovial in a way that never sounds safe, throaty and wild.",
+ace:"A confident young man around twenty, warm mid-range voice, easy-going and brotherly, with a rasp that breaks when he is emotional.",
+garp:"A barrel-chested old marine, enormous belly-laugh voice, loud and blustering, hearty and terrifying in equal measure.",
+law:"A young man in his mid-twenties, low, cool, unhurried and clinical, faintly bored, every word precisely placed.",
+crocodile:"A tall man in his forties, deep gravelly smoker's voice, slow and contemptuous, silk over broken glass.",
+mihawk:"A refined man in his forties, low aristocratic voice, cold, precise, utterly calm, never hurried.",
+enel:"A smug man with a smooth, serene, sing-song voice that slides into cruel amusement, convinced he is divine.",
+hancock:"A haughty beautiful woman, rich imperious voice, dramatic and disdainful, softening only when flustered.",
+kizaru:"A lazy man in his fifties, sing-song drawling voice, unhurried and amused, terrifyingly casual.",
+akainu:"A hard man in his forties, harsh grinding voice, absolute and merciless, controlled fury.",
+bigmom:"An enormous woman, huge sing-song voice that swings between childish delight and monstrous rage, loud and unstable.",
+ivankov:"A flamboyant booming voice, theatrical and enormous, rolling and campy, larger than life.",
+perona:"A bratty teenage girl, shrill and sing-song, delighted by her own cruelty, giggly.",
+jinbe:"A large fish-man warrior in his forties, deep resonant honest voice, steady and calm, deeply reassuring.",
+hiluluk:"An old quack doctor, cracked wheezing voice, wildly passionate, shouting through failing lungs.",
+shirahoshi:"An enormous but childlike mermaid princess, tiny high trembling voice, constantly on the edge of tears, very gentle."
+};
+function personaFor(n) {
+  if (PERSONA[n.id]) return PERSONA[n.id];
+  const f = FACTIONS[n.faction].name;
+  const heft = n.size >= 4 ? "an enormous legendary presence, deep and commanding"
+    : n.size === 3 ? "a seasoned, confident adult voice with real weight"
+    : n.size === 2 ? "a distinctive adult voice with character" : "a lighter, ordinary voice";
+  return `A character from a pirate adventure anime, aligned with ${f}. ${heft}. ${(CAST[n.id] || ["", "Speaks in character"])[1]}.`;
+}
 let voiceSrc = null;
 function stopVoice() {
   if (voiceSrc) { try { voiceSrc.stop(); } catch (e) {} voiceSrc = null; }
   if ("speechSynthesis" in window) speechSynthesis.cancel();
 }
+function playB64Audio(b64, mime) {
+  if (!mime || /l16|pcm/.test(mime)) { playPcm(b64); return Promise.resolve(); }
+  const a = ac();
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return a.decodeAudioData(bytes.buffer).then(buf => {
+    stopVoice();
+    const src = a.createBufferSource();
+    src.buffer = buf; src.connect(a.destination); src.start();
+    voiceSrc = src;
+  });
+}
+// ---- ElevenLabs: design a brand-new voice from a written description ----
+const EL = {
+  key: () => localStorage.getItem("opw_el_key") || "",
+  voices: () => { try { return JSON.parse(localStorage.getItem("opw_el_voice") || "{}"); } catch (e) { return {}; } },
+  setVoice(id, v) { const m = EL.voices(); m[id] = v; localStorage.setItem("opw_el_voice", JSON.stringify(m)); },
+  async design(desc) {
+    const r = await fetch("https://api.elevenlabs.io/v1/text-to-voice/design", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "xi-api-key": EL.key() },
+      body: JSON.stringify({ voice_description: desc, auto_generate_text: true })
+    });
+    if (!r.ok) throw new Error("design failed (" + r.status + ")");
+    return (await r.json()).previews || [];
+  },
+  async create(name, desc, generatedVoiceId) {
+    const r = await fetch("https://api.elevenlabs.io/v1/text-to-voice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "xi-api-key": EL.key() },
+      body: JSON.stringify({ voice_name: name, voice_description: desc, generated_voice_id: generatedVoiceId })
+    });
+    if (!r.ok) throw new Error("save failed (" + r.status + ")");
+    return (await r.json()).voice_id;
+  },
+  async tts(voiceId, line) {
+    const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "xi-api-key": EL.key() },
+      body: JSON.stringify({ text: line, model_id: "eleven_multilingual_v2" })
+    });
+    if (!r.ok) throw new Error("speech failed (" + r.status + ")");
+    const buf = await r.arrayBuffer();
+    let s = "";
+    const b = new Uint8Array(buf);
+    for (let i = 0; i < b.length; i += 8192) s += String.fromCharCode.apply(null, b.subarray(i, i + 8192));
+    return btoa(s);
+  }
+};
 function playPcm(b64) {
   const a = ac();
   const bin = atob(b64);
@@ -1150,7 +1455,7 @@ async function ttsFetch(key, voiceName, direction, line) {
             generation_config: { speech_config: [{ voice: voiceName }] }
           })
         });
-        if (!r.ok) throw new Error("interactions http " + r.status);
+        if (!r.ok) throw new Error(r.status === 429 ? "quota" : "interactions http " + r.status);
         const j = await r.json();
         const c = j.steps && j.steps[0] && j.steps[0].content && j.steps[0].content[0];
         if (c && c.type === "audio" && c.data) b64 = c.data;
@@ -1168,7 +1473,7 @@ async function ttsFetch(key, voiceName, direction, line) {
               }
             })
           });
-          if (!r.ok) { if (r.status === 404) continue; throw new Error("http " + r.status); }
+          if (!r.ok) { if (r.status === 404) continue; throw new Error(r.status === 429 ? "quota" : "http " + r.status); }
           const j = await r.json();
           const p = j.candidates && j.candidates[0] && j.candidates[0].content
             && j.candidates[0].content.parts && j.candidates[0].content.parts[0];
@@ -1203,21 +1508,46 @@ async function speakGemini(n, q, key, token) {
   if (token !== speakSeq || selected !== n) return; // superseded or card changed
   playPcm(b64);
 }
+async function speakEleven(n, q, token) {
+  const v = EL.voices()[n.id];
+  if (!v || !EL.key()) return false;
+  const ck = "el:" + n.id + ":" + v.voice_id;
+  let b64 = await vget(ck);
+  if (!b64) {
+    if (!genPending[ck]) {
+      setQuoteStatus("🎙 summoning their voice…");
+      genPending[ck] = EL.tts(v.voice_id, q[1])
+        .finally(() => { delete genPending[ck]; setQuoteStatus(null); });
+    }
+    b64 = await genPending[ck];
+    vput(ck, b64);
+  }
+  if (token !== speakSeq || selected !== n) return true;
+  await playB64Audio(b64, "audio/mpeg");
+  return true;
+}
 async function speakQuote(n) {
   if (!dialogueOn) return;
   const q = QUOTES[n.id];
   if (!q || q[0] > ep) return;
   const token = ++speakSeq;
   stopVoice();
+  // 1) a voice you designed for this character wins
+  try { if (await speakEleven(n, q, token)) return; }
+  catch (e) { if (token !== speakSeq) return; }
+  // 2) otherwise Gemini's stock cast
   const key = localStorage.getItem("opw_gemini_key");
   if (key) {
     try { await speakGemini(n, q, key, token); return; }
     catch (e) {
       if (token !== speakSeq) return;
-      setQuoteStatus("⚠ voice engine unreachable, using narrator");
-      setTimeout(() => setQuoteStatus(null), 2500);
+      const quota = /quota|429/.test(String(e.message || e));
+      setQuoteStatus(quota ? "⚠ free voice quota used up for now — narrator instead"
+                           : "⚠ voice engine unreachable, using narrator");
+      setTimeout(() => setQuoteStatus(null), 3500);
     }
   }
+  // 3) last resort: the device narrator
   if (token !== speakSeq || selected !== n) return;
   speakTTS(n, q);
 }
