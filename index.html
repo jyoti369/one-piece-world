@@ -216,7 +216,12 @@
     <h2>Where are you in the story?</h2>
     <p>Set the last episode you've watched. The world will never show you anyone or anything past it.</p>
     <input type="number" id="myep" min="1" max="589" value="589">
-    <br>
+    <div style="text-align:left;margin:6px 0 14px">
+      <label style="font-size:12px;color:var(--muted)">Gemini API key (optional) — characters speak with real acted voices</label>
+      <input type="password" id="gkey" placeholder="AIza…" autocomplete="off"
+        style="width:100%;margin-top:5px;font-size:13px;text-align:left;padding:8px 10px;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:8px">
+      <div class="note" style="text-align:left;margin-top:5px">Free key at aistudio.google.com/apikey. Stays on this device only. Without it, dialogue uses your device's narrator voice.</div>
+    </div>
     <button class="primary" id="modalgo">Set sail</button>
     <div class="note">Data currently covers up to episode 589. Saved on this device.</div>
   </div>
@@ -919,10 +924,8 @@ if ("speechSynthesis" in window) {
   pickTtsVoice();
   speechSynthesis.onvoiceschanged = pickTtsVoice;
 }
-function speakQuote(n) {
-  if (!dialogueOn || !("speechSynthesis" in window)) return;
-  const q = QUOTES[n.id];
-  if (!q || q[0] > ep) return;
+function speakTTS(n, q) {
+  if (!("speechSynthesis" in window)) return;
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(q[1]);
   const [p, r] = VOICE[n.id] || VOICE_DEFAULT[n.size];
@@ -930,12 +933,187 @@ function speakQuote(n) {
   if (ttsVoice) u.voice = ttsVoice;
   speechSynthesis.speak(u);
 }
+
+// ---- acted voices via Gemini TTS (BYO key, cached on device) ----
+// casting: [prebuilt voice, acting direction] — Google stock voices, not clones
+const CAST = {
+luffy:["Puck","Shout with wild raspy joy, a reckless teenage pirate captain declaring his dream"],
+zoro:["Alnilam","Say low and dead serious, a stoic swordsman who never bluffs"],
+nami:["Kore","Say it as a desperate, tearful plea from a proud young woman finally asking for help"],
+usopp:["Sadachbia","Boast at top speed, a cowardly liar puffing his chest out"],
+sanji:["Achird","Say smooth and warm, a chivalrous cook stating his creed"],
+chopper:["Leda","Squeak it out, a tiny excited reindeer child promising with all his heart"],
+robin:["Callirrhoe","Cry it out, a quiet woman breaking open and begging to live"],
+franky:["Orus","Bellow it triumphantly, a boisterous cyborg celebrating himself"],
+brook:["Iapetus","Say theatrically like a gentleman skeleton, ending in a rolling yo-ho-ho laugh"],
+roger:["Charon","Say amused and unafraid, a legend grinning at his own execution"],
+shanks:["Alnilam","Say calm with quiet steel, a friendly man whose patience just ran out"],
+whitebeard:["Charon","Roar it slowly with dying might, an ancient giant shaking the world with his last breath"],
+ace:["Fenrir","Say through tears with a smile, a young man grateful at the very end"],
+blackbeard:["Algieba","Say with greasy booming cheer that hides menace"],
+buggy:["Puck","Screech it with clownish bravado and wounded pride"],
+mihawk:["Enceladus","Say cold and aristocratic, a bored master acknowledging a worthy child"],
+crocodile:["Algenib","Drawl it low and gravelly, a villain amused by idealists"],
+smoker:["Algenib","Growl it around a cigar, a relentless marine making a promise"],
+garp:["Orus","Boom it with a huge laugh, an old marine hero disciplining his grandson"],
+dragon:["Enceladus","Say quiet and vast, a revolutionary speaking of storms"],
+coby:["Leda","Say it trembling but resolute, a timid boy swearing an oath"],
+law:["Schedar","Say cool, low and measured, a surgeon stating a grim fact"],
+kid:["Fenrir","Snarl it, a violent young punk daring the world to laugh"],
+hancock:["Aoede","Say imperious and haughty, an empress certain the world adores her"],
+jinbe:["Orus","Say solemn and steady, a wise warrior anchoring a broken man"],
+ivankov:["Gacrux","Proclaim it flamboyantly at full volume, a queen of miracles"],
+kuma:["Charon","Say flat, enormous and eerily gentle"],
+kizaru:["Umbriel","Drawl it lazily in a sing-song, mildly amused and terrifying"],
+aokiji:["Enceladus","Say sleepy and low, justice that can barely be bothered"],
+akainu:["Algenib","Say harsh and absolute, magma barely contained"],
+sengoku:["Charon","Announce it gravely, a fleet admiral revealing a terrible secret"],
+moria:["Algieba","Say it with a creeping kishishishi glee"],
+perona:["Despina","Say bratty and shrill, a ghost princess enjoying herself"],
+enel:["Sadaltager","Proclaim it smug and serene, a man certain he is god"],
+bellamy:["Fenrir","Sneer it loudly, a bully mocking dreamers"],
+doflamingo:["Sulafat","Say silken and mocking, a puppet-master savoring chaos"],
+rayleigh:["Alnilam","Say warm and knowing, an old legend passing the torch"],
+arlong:["Algenib","Snarl it with contempt, a proud predator"],
+zeff:["Orus","Bark it gruffly, an old chef whose kindness is non-negotiable"],
+gin:["Schedar","Say hollow and shaking, a hard man undone by one kindness"],
+kuro:["Enceladus","Say icy and precise, a butler done pretending"],
+kaya:["Leda","Say soft and fond, a gentle girl remembering"],
+alvida:["Aoede","Purr it vainly, a pirate queen fishing for compliments"],
+mr2:["Gacrux","Cry it out flamboyantly, a friend who regrets nothing"],
+hiluluk:["Rasalgethi","Cry it out with dying triumph, a quack doctor proving a life mattered"],
+kureha:["Vindemiatrix","Cackle it, a 140-year-old doctor deflecting the question"],
+vivi:["Kore","Scream it through tears, a princess begging a war to stop"],
+kinemon:["Achird","Declare it formally and desperately, a samurai demanding his body back"],
+shirahoshi:["Leda","Say it tiny and sniffling, an enormous gentle princess apologizing"],
+neptune:["Charon","Boom it cheerfully, a great sea king"],
+fishertiger:["Orus","Confess it heavy and wounded, a hero admitting his limit"],
+otohime:["Callirrhoe","Plead it gently, a queen asking for a kinder future"],
+hody:["Algenib","Spit it with pure inherited hatred"],
+bigmom:["Gacrux","Sing-song it into a bellow, a monstrous empress demanding sweets"],
+magellan:["Algenib","Intone it heavy and official, the warden of hell"],
+kalifa:["Aoede","Say it flat and clipped, pushing up her glasses"],
+lucci:["Enceladus","Say soft and lethal, a killer explaining his creed"],
+hawkins:["Schedar","Intone it flat and fatalistic, reading fate off a card"],
+bonney:["Despina","Snap it with a mouth full of pizza"],
+camie:["Leda","Chirp it happily, a bubbly mermaid"],
+dadan:["Vindemiatrix","Roar it through furious tears, a bandit who loved him too"],
+sabo:["Fenrir","Say it bright and free, a boy writing his last letter"],
+marco:["Schedar","Say it burning and loyal, a first mate holding the line"],
+fukaboshi:["Orus","Vow it solemnly, a prince ending a cycle of hate"]
+};
+const FEMALE = new Set(["tashigi","shakky"]);
+const TTS_MODELS = ["gemini-2.5-flash-preview-tts","gemini-2.5-flash-tts","gemini-2.5-pro-preview-tts"];
+function castFor(n) {
+  if (CAST[n.id]) return CAST[n.id];
+  if (FEMALE.has(n.id)) return ["Kore","Say it in character, a determined woman of the seas"];
+  return [n.size >= 3 ? "Charon" : "Schedar", "Say it in character, a seasoned pirate-era voice"];
+}
+let vdb = null;
+function vopen() {
+  return new Promise((res, rej) => {
+    if (vdb) return res(vdb);
+    const r = indexedDB.open("opw_voices", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("v");
+    r.onsuccess = () => { vdb = r.result; res(vdb); };
+    r.onerror = () => rej(r.error);
+  });
+}
+function vget(k) {
+  return vopen().then(db => new Promise(res => {
+    const t = db.transaction("v").objectStore("v").get(k);
+    t.onsuccess = () => res(t.result || null);
+    t.onerror = () => res(null);
+  })).catch(() => null);
+}
+function vput(k, val) {
+  return vopen().then(db => new Promise(res => {
+    const t = db.transaction("v", "readwrite").objectStore("v").put(val, k);
+    t.onsuccess = () => res(); t.onerror = () => res();
+  })).catch(() => {});
+}
+let voiceSrc = null;
+function stopVoice() {
+  if (voiceSrc) { try { voiceSrc.stop(); } catch (e) {} voiceSrc = null; }
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+}
+function playPcm(b64) {
+  const a = ac();
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const i16 = new Int16Array(bytes.buffer);
+  const buf = a.createBuffer(1, i16.length, 24000);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < i16.length; i++) d[i] = i16[i] / 32768;
+  stopVoice();
+  const src = a.createBufferSource();
+  src.buffer = buf;
+  src.connect(a.destination);
+  src.start();
+  voiceSrc = src;
+}
+function setQuoteStatus(msg) {
+  const s = document.querySelector("#c-quote .ep");
+  if (!s) return;
+  if (msg) { s.dataset.prev = s.dataset.prev || s.textContent; s.textContent = msg; }
+  else if (s.dataset.prev) { s.textContent = s.dataset.prev; delete s.dataset.prev; }
+}
+async function speakGemini(n, q, key) {
+  const ck = "v2:" + n.id;
+  let b64 = await vget(ck);
+  if (!b64) {
+    setQuoteStatus("🎙 summoning their voice…");
+    const [voiceName, style] = castFor(n);
+    const body = JSON.stringify({
+      contents: [{ parts: [{ text: `${style}: "${q[1]}"` }] }],
+      generationConfig: {
+        responseModalities: ["AUDIO"],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } }
+      }
+    });
+    let lastErr = null;
+    const preferred = localStorage.getItem("opw_tts_model");
+    const models = preferred ? [preferred, ...TTS_MODELS.filter(m => m !== preferred)] : TTS_MODELS;
+    for (const m of models) {
+      try {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`,
+          { method: "POST", headers: { "Content-Type": "application/json" }, body });
+        if (!r.ok) { lastErr = new Error("http " + r.status); if (r.status === 404) continue; else break; }
+        const j = await r.json();
+        b64 = j.candidates && j.candidates[0] && j.candidates[0].content
+          && j.candidates[0].content.parts && j.candidates[0].content.parts[0]
+          && j.candidates[0].content.parts[0].inlineData
+          && j.candidates[0].content.parts[0].inlineData.data;
+        if (b64) { localStorage.setItem("opw_tts_model", m); break; }
+        lastErr = new Error("no audio in response");
+      } catch (e) { lastErr = e; }
+    }
+    setQuoteStatus(null);
+    if (!b64) throw lastErr || new Error("tts failed");
+    vput(ck, b64);
+  }
+  if (selected !== n) return; // user moved on while we were generating
+  playPcm(b64);
+}
+async function speakQuote(n) {
+  if (!dialogueOn) return;
+  const q = QUOTES[n.id];
+  if (!q || q[0] > ep) return;
+  stopVoice();
+  const key = localStorage.getItem("opw_gemini_key");
+  if (key) {
+    try { await speakGemini(n, q, key); return; }
+    catch (e) { setQuoteStatus("⚠ voice engine unreachable, using narrator"); setTimeout(() => setQuoteStatus(null), 2500); }
+  }
+  speakTTS(n, q);
+}
 function setDialogue(on) {
   dialogueOn = on;
   localStorage.setItem("opw_dialogue", on ? "on" : "off");
   document.getElementById("dialoguebtn").textContent = on ? "💬" : "🤐";
   document.getElementById("dialoguebtn").style.opacity = on ? "1" : "0.55";
-  if (!on && "speechSynthesis" in window) speechSynthesis.cancel();
+  if (!on) stopVoice();
 }
 document.getElementById("dialoguebtn").onclick = () => {
   setDialogue(!dialogueOn);
@@ -1097,12 +1275,16 @@ function applyMyEp(v) {
 }
 document.getElementById("modalgo").onclick = () => {
   applyMyEp(parseInt(document.getElementById("myep").value, 10));
+  const gk = document.getElementById("gkey").value.trim();
+  if (gk) localStorage.setItem("opw_gemini_key", gk);
+  else localStorage.removeItem("opw_gemini_key");
   document.getElementById("modal-bg").style.display = "none";
   setEpisode(myEp);
   toast(`The world as of episode ${myEp}. Drag the timeline to travel back.`);
 };
 document.getElementById("setep").onclick = () => {
   document.getElementById("myep").value = myEp;
+  document.getElementById("gkey").value = localStorage.getItem("opw_gemini_key") || "";
   document.getElementById("modal-bg").style.display = "flex";
 };
 
@@ -1182,7 +1364,7 @@ function openCard(n) {
 function closeCard() {
   selected = null;
   document.getElementById("card").style.display = "none";
-  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  stopVoice();
 }
 document.getElementById("cardclose").onclick = closeCard;
 
