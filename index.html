@@ -1185,29 +1185,40 @@ async function ttsFetch(key, voiceName, direction, line) {
   }
   throw lastErr || new Error("tts failed");
 }
-async function speakGemini(n, q, key) {
+let speakSeq = 0;            // latest-wins: stale generations never play
+const genPending = {};       // in-flight generations shared, never duplicated
+async function speakGemini(n, q, key, token) {
   const [voiceName, direction] = castFor(n);
   const ck = "v3:" + n.id + ":" + voiceName;
   let b64 = await vget(ck);
   if (!b64) {
-    setQuoteStatus("🎙 summoning their voice…");
-    try { b64 = await ttsFetch(key, voiceName, direction, q[1]); }
-    finally { setQuoteStatus(null); }
+    if (!genPending[ck]) {
+      setQuoteStatus("🎙 summoning their voice…");
+      genPending[ck] = ttsFetch(key, voiceName, direction, q[1])
+        .finally(() => { delete genPending[ck]; setQuoteStatus(null); });
+    }
+    b64 = await genPending[ck];
     vput(ck, b64);
   }
-  if (selected !== n) return; // user moved on while we were generating
+  if (token !== speakSeq || selected !== n) return; // superseded or card changed
   playPcm(b64);
 }
 async function speakQuote(n) {
   if (!dialogueOn) return;
   const q = QUOTES[n.id];
   if (!q || q[0] > ep) return;
+  const token = ++speakSeq;
   stopVoice();
   const key = localStorage.getItem("opw_gemini_key");
   if (key) {
-    try { await speakGemini(n, q, key); return; }
-    catch (e) { setQuoteStatus("⚠ voice engine unreachable, using narrator"); setTimeout(() => setQuoteStatus(null), 2500); }
+    try { await speakGemini(n, q, key, token); return; }
+    catch (e) {
+      if (token !== speakSeq) return;
+      setQuoteStatus("⚠ voice engine unreachable, using narrator");
+      setTimeout(() => setQuoteStatus(null), 2500);
+    }
   }
+  if (token !== speakSeq || selected !== n) return;
   speakTTS(n, q);
 }
 function setDialogue(on) {
@@ -1352,7 +1363,7 @@ function setEpisode(v, fromSlider) {
   localStorage.setItem("opw_slider", ep);
   updateCounter();
   if (selected && selected.debut > ep) closeCard();
-  if (selected) openCard(selected); // refresh bounty/relations for new ep
+  if (selected) openCard(selected, true); // silent refresh: update bounty/relations, no re-speak
 }
 function updateCounter() {
   const n = visibleNodes().length, e = visibleEdges().length;
@@ -1414,7 +1425,8 @@ function fmtBounty(v) {
   if (v < 1000) return v + " berries";
   return v.toLocaleString("en-US") + " berries";
 }
-function openCard(n) {
+function openCard(n, refresh) {
+  const sameCard = selected === n;
   selected = n;
   const pimg = document.getElementById("c-portrait");
   if (IMGS[n.id]) {
@@ -1446,8 +1458,10 @@ function openCard(n) {
     const hasKey = !!localStorage.getItem("opw_gemini_key");
     al.style.display = hasKey ? "block" : "none";
     al.onclick = () => buildAudition(n);
-    document.getElementById("c-audit").style.display = "none";
-    speakQuote(n);
+    if (!refresh && !sameCard) {
+      document.getElementById("c-audit").style.display = "none";
+      speakQuote(n);
+    }
   } else if (q) {
     qel.innerHTML = `<span style="opacity:.55">🔒 has a famous line you haven't heard yet…</span>`;
     qel.style.display = "block";
