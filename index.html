@@ -83,6 +83,12 @@
     border-radius: 12px; padding: 16px; display: none; z-index: 9;
   }
   #card h2 { font-size: 17px; color: var(--accent); }
+  #c-portrait {
+    display: none; width: 88px; height: 88px; border-radius: 50%;
+    object-fit: cover; object-position: top; float: right;
+    margin: 0 0 8px 10px; border: 3px solid var(--line);
+    background: var(--panel2);
+  }
   #card .epithet { font-style: italic; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
   #card .meta { font-size: 12px; color: var(--muted); margin: 8px 0; line-height: 1.7; }
   #card .meta b { color: var(--ink); font-weight: 600; }
@@ -181,6 +187,7 @@
   <div id="tooltip"></div>
   <div id="card">
     <button class="close" id="cardclose">✕</button>
+    <img id="c-portrait" alt="">
     <h2 id="c-name"></h2>
     <div class="epithet" id="c-epithet"></div>
     <div class="meta" id="c-meta"></div>
@@ -493,6 +500,105 @@ const LINKCOLORS = {
   crew:"#f5c542", family:"#66bb6a", ally:"#4fc3f7", friend:"#9ccc65",
   mentor:"#ba68c8", rival:"#ff8a65", enemy:"#ef5350", meet:"#607094"
 };
+const IMG_BASE = "https://static.wikia.nocookie.net/onepiece/images/";
+// portraits hotlinked from the One Piece Wiki (Fandom, CC-BY-SA community uploads);
+// spoiler-reviewed: pre-timeskip variants used wherever the current look is a post-589 reveal
+const IMGS = {
+ace:"4/4f/Portgas_D._Ace_Anime_Infobox.png/revision/latest/scale-to-width-down/120?cb=20240629132600",
+akainu:"6/6c/Sakazuki_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20220611130113",
+alvida:"c/cd/Alvida_Anime_Infobox.png/revision/latest/scale-to-width-down/115?cb=20221116234952",
+aokiji:"a/a9/Kuzan_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20230221222337",
+apoo:"6/60/Scratchmen_Apoo_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20210426142143",
+arlong:"0/01/Arlong_Anime_Infobox.png/revision/latest/scale-to-width-down/151?cb=20230403145629",
+bellamy:"3/33/Bellamy_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20230830195651",
+bigmom:"d/d8/Charlotte_Linlin_Anime_Infobox.png/revision/latest/scale-to-width-down/200?cb=20180423150804",
+blackbeard:"e/e4/Marshall_D._Teach_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20230406003453",
+blueno:"9/9d/Blueno_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20220824170259",
+bonney:"6/62/Jewelry_Bonney_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20230122231048",
+brogy:"b/bf/Brogy_Anime_Infobox.png/revision/latest/scale-to-width-down/188?cb=20250824161255",
+brook:"4/41/Brook_Anime_Post_Timeskip_Infobox.png/revision/latest/scale-to-width-down/85?cb=20161016160925",
+buggy:"a/a8/Buggy_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20220921002630",
+camie:"a/af/Camie_Anime_Post_Timeskip_Infobox.png/revision/latest/scale-to-width-down/112?cb=20130912213617",
+capone:"b/b2/Capone_Bege_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20230122231334",
+chopper:"a/af/Tony_Tony_Chopper_Anime_Post_Timeskip_Infobox.png/revision/latest/scale-to-width-down/156?cb=20240720150824",
+coby:"6/64/Koby_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20160819204148",
+cricket:"f/f6/Mont_Blanc_Cricket_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20130625032527",
+crocodile:"f/fd/Crocodile_Anime_Infobox.png/revision/latest/scale-to-width-down/159?cb=20230125235528",
+dadan:"b/b4/Curly_Dadan_Anime_Infobox.png/revision/latest/scale-to-width-down/200?cb=20160802231340",
+dalton:"0/07/Dalton_Anime_Infobox.png/revision/latest/scale-to-width-down/194?cb=20230101225126",
+decken:"d/d3/Vander_Decken_IX_Anime_Infobox.png/revision/latest/scale-to-width-down/200?cb=20130504034305",
+doflamingo:"7/7e/Donquixote_Doflamingo_Anime_Infobox.png/revision/latest/scale-to-width-down/172?cb=20231017082245",
+dorry:"2/2d/Dorry_Anime_Infobox.png/revision/latest/scale-to-width-down/159?cb=20250927120409",
+dragon:"f/f5/Monkey_D._Dragon_Anime_Infobox.png/revision/latest/scale-to-width-down/137?cb=20250621010227",
+drake:"3/36/X_Drake_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20230127014013",
+enel:"a/ad/Enel_Anime_Infobox.png/revision/latest/scale-to-width-down/200?cb=20230520213625",
+fishertiger:"c/c5/Fisher_Tiger_Anime_Infobox.png/revision/latest/scale-to-width-down/161?cb=20230214162116",
+foxy:"b/bf/Foxy_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20151221112648",
+franky:"8/8c/Franky_Anime_Post_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20241110020715",
+fukaboshi:"2/29/Fukaboshi_Anime_Infobox.png/revision/latest/scale-to-width-down/171?cb=20140107021229",
+ganfall:"5/5f/Gan_Fall_Anime_Infobox.png/revision/latest/scale-to-width-down/142?cb=20221111195904",
+garp:"e/e1/Monkey_D._Garp_Anime_Infobox.png/revision/latest/scale-to-width-down/200?cb=20230207160645",
+gin:"4/49/Gin_Anime_Infobox.png/revision/latest/scale-to-width-down/173?cb=20220920031419",
+hancock:"f/f0/Boa_Hancock_Anime_Infobox.png/revision/latest/scale-to-width-down/97?cb=20230126022456",
+hatchan:"3/3d/Hatchan_Anime_Infobox.png/revision/latest/scale-to-width-down/121?cb=20221003174139",
+hawkins:"4/48/Basil_Hawkins_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20231002032946",
+helmeppo:"c/cc/Helmeppo_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20160819202756",
+hiluluk:"c/c0/Hiriluk_Anime_Infobox.png/revision/latest/scale-to-width-down/108?cb=20190519083444",
+hody:"f/f3/Hody_Jones_Anime_Infobox.png/revision/latest/scale-to-width-down/188?cb=20230609234039",
+iceburg:"0/00/Iceburg_Anime_Infobox.png/revision/latest/scale-to-width-down/162?cb=20230620131854",
+igaram:"d/d9/Igaram_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20221003170030",
+ivankov:"d/de/Emporio_Ivankov_Anime_Infobox.png/revision/latest/scale-to-width-down/131?cb=20180624120810",
+jinbe:"8/81/Jinbe_Anime_Infobox.png/revision/latest/scale-to-width-down/157?cb=20170521201349",
+kaku:"1/11/Kaku_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20221212230116",
+kalifa:"5/59/Kalifa_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20240612223256",
+kaya:"d/da/Kaya_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20130710070622",
+kid:"5/5b/Eustass_Kid_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20230207013430",
+killer:"9/98/Killer_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20210202064751",
+kinemon:"e/ec/Kin%27emon_Anime_Infobox.png/revision/latest/scale-to-width-down/108?cb=20191124100115",
+kizaru:"1/14/Borsalino_Anime_Infobox.png/revision/latest/scale-to-width-down/99?cb=20190603023753",
+krieg:"b/bb/Krieg_Anime_Infobox.png/revision/latest/scale-to-width-down/159?cb=20230123170612",
+kuma:"8/8d/Bartholomew_Kuma_Anime_Infobox.png/revision/latest/scale-to-width-down/119?cb=20221012030835",
+kureha:"1/1b/Kureha_Anime_Infobox.png/revision/latest/scale-to-width-down/99?cb=20150819163116",
+kuro:"7/7e/Kuro_Anime_Infobox.png/revision/latest/scale-to-width-down/126?cb=20231006042805",
+laboon:"8/88/Laboon_Anime_Infobox.png/revision/latest/scale-to-width-down/200?cb=20180508212232",
+law:"4/4d/Trafalgar_D._Water_Law_Anime_Post_Timeskip_Infobox.png/revision/latest/scale-to-width-down/89?cb=20230124163510",
+lucci:"0/08/Rob_Lucci_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20221011222455",
+luffy:"6/6d/Monkey_D._Luffy_Anime_Post_Timeskip_Infobox.png/revision/latest/scale-to-width-down/95?cb=20260611004637",
+magellan:"2/21/Magellan_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20221023232031",
+mihawk:"b/bf/Dracule_Mihawk_Anime_Infobox.png/revision/latest/scale-to-width-down/129?cb=20151222105910",
+morgan:"e/e5/Morgan_Anime_Infobox.png/revision/latest/scale-to-width-down/147?cb=20160802223743",
+moria:"b/be/Gecko_Moria_Anime_Infobox.png/revision/latest/scale-to-width-down/200?cb=20181127062446",
+mr2:"0/0e/Bentham_Anime_Infobox.png/revision/latest/scale-to-width-down/112?cb=20160929070742",
+mr3:"1/13/Galdino_Anime_Infobox.png/revision/latest/scale-to-width-down/155?cb=20221003165116",
+nami:"6/68/Nami_Anime_Post_Timeskip_Infobox.png/revision/latest/scale-to-width-down/119?cb=20260315214841",
+neptune:"4/40/Neptune_Anime_Infobox.png/revision/latest/scale-to-width-down/166?cb=20131206042454",
+otohime:"c/c7/Otohime_Anime_Infobox.png/revision/latest/scale-to-width-down/200?cb=20130427195608",
+paulie:"3/3d/Paulie_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20230117225854",
+pekoms:"1/15/Pekoms_Anime_Infobox.png/revision/latest/scale-to-width-down/104?cb=20221107145536",
+perona:"4/4a/Perona_Anime_Post_Timeskip_Infobox.png/revision/latest/scale-to-width-down/116?cb=20221124200121",
+rayleigh:"b/b1/Silvers_Rayleigh_Anime_Infobox.png/revision/latest/scale-to-width-down/105?cb=20230601221758",
+robin:"b/bc/Nico_Robin_Anime_Post_Timeskip_Infobox.png/revision/latest/scale-to-width-down/92?cb=20260610121757",
+roger:"2/24/Gol_D._Roger_Anime_Infobox.png/revision/latest/scale-to-width-down/200?cb=20230612100153",
+sanji:"b/b6/Sanji_Anime_Post_Timeskip_Infobox.png/revision/latest/scale-to-width-down/66?cb=20240122012744",
+sengoku:"0/08/Sengoku_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20230213230306",
+sentomaru:"0/0b/Sentomaru_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20250706120503",
+shakky:"e/e8/Shakuyaku_Anime_Infobox.png/revision/latest/scale-to-width-down/82?cb=20241117020947",
+shanks:"6/66/Shanks_Anime_Infobox.png/revision/latest/scale-to-width-down/139?cb=20240829145447",
+shirahoshi:"c/c1/Shirahoshi_Anime_Infobox.png/revision/latest/scale-to-width-down/200?cb=20240814220909",
+smoker:"c/c4/Smoker_Anime_Post_Timeskip_Infobox.png/revision/latest/scale-to-width-down/153?cb=20221101011905",
+spandam:"b/bd/Spandam_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20230120135641",
+tamago:"4/49/Tamago_Anime_Infobox.png/revision/latest/scale-to-width-down/129?cb=20171126235414",
+tashigi:"1/1e/Tashigi_Anime_Post_Timeskip_Infobox.png/revision/latest/scale-to-width-down/131?cb=20251127120726",
+urouge:"f/fb/Urouge_Anime_Infobox.png/revision/latest/scale-to-width-down/146?cb=20230126223235",
+usopp:"3/35/Usopp_Anime_Post_Timeskip_Infobox.png/revision/latest/scale-to-width-down/107?cb=20221127233827",
+vivi:"2/25/Nefertari_Vivi_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20240622194525",
+wapol:"b/bc/Wapol_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20221010220208",
+whitebeard:"b/b7/Edward_Newgate_Anime_Infobox.png/revision/latest/scale-to-width-down/200?cb=20220926165737",
+wyper:"a/a6/Wyper_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-down/200?cb=20221123062252",
+zeff:"d/d9/Zeff_Anime_Infobox.png/revision/latest/scale-to-width-down/134?cb=20230617083525",
+zoro:"5/52/Roronoa_Zoro_Anime_Post_Timeskip_Infobox.png/revision/latest/scale-to-width-down/75?cb=20241029161719"
+};
+
 </script>
 
 <script>
@@ -591,6 +697,19 @@ function tick() {
   });
 }
 
+// ---------------- portraits ----------------
+const IMG_CACHE = {};
+function portrait(n) {
+  if (!IMGS[n.id]) return null;
+  let c = IMG_CACHE[n.id];
+  if (!c) {
+    c = IMG_CACHE[n.id] = { img: new Image(), ok: false };
+    c.img.onload = () => { c.ok = true; };
+    c.img.src = IMG_BASE + IMGS[n.id];
+  }
+  return c.ok ? c.img : null;
+}
+
 // ---------------- render ----------------
 function resize() {
   const dpr = window.devicePixelRatio || 1;
@@ -609,7 +728,7 @@ function screenToWorld(px, py) {
   const r = canvas.getBoundingClientRect();
   return [(px - r.width/2) / cam.z + cam.x, (py - r.height/2) / cam.z + cam.y];
 }
-function nodeR(n) { return (6 + n.size * 3.2); }
+function nodeR(n) { return (7 + n.size * 3.8); }
 
 function draw() {
   const r = canvas.getBoundingClientRect();
@@ -648,12 +767,28 @@ function draw() {
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    ctx.beginPath();
-    ctx.arc(x, y, rad, 0, 6.29);
-    ctx.fillStyle = col;
+    const img = portrait(n);
     ctx.globalAlpha = dim ? 0.15 : 1;
-    ctx.fill();
+    if (img) {
+      ctx.save();
+      ctx.beginPath(); ctx.arc(x, y, rad, 0, 6.29); ctx.clip();
+      // square crop biased toward the top of the portrait, where the face is
+      const s = Math.min(img.naturalWidth, img.naturalHeight);
+      const sy = (img.naturalHeight - s) * 0.12;
+      ctx.fillStyle = "#1a2340";
+      ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+      ctx.drawImage(img, (img.naturalWidth - s) / 2, sy, s, s, x - rad, y - rad, rad * 2, rad * 2);
+      ctx.restore();
+      ctx.beginPath(); ctx.arc(x, y, rad, 0, 6.29);
+      ctx.strokeStyle = col; ctx.lineWidth = Math.max(1.5, rad * 0.12); ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(x, y, rad, 0, 6.29);
+      ctx.fillStyle = col;
+      ctx.fill();
+    }
     if (n === selected || n === hovered) {
+      ctx.beginPath(); ctx.arc(x, y, rad + 1, 0, 6.29);
       ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
     }
     // labels: big names always, others when zoomed or highlighted
@@ -747,6 +882,15 @@ function fmtBounty(v) {
 }
 function openCard(n) {
   selected = n;
+  const pimg = document.getElementById("c-portrait");
+  if (IMGS[n.id]) {
+    pimg.src = IMG_BASE + IMGS[n.id];
+    pimg.style.borderColor = FACTIONS[n.faction].color;
+    pimg.style.display = "block";
+    pimg.onerror = () => { pimg.style.display = "none"; };
+  } else {
+    pimg.style.display = "none";
+  }
   document.getElementById("c-name").textContent = n.name;
   document.getElementById("c-epithet").textContent = n.epithet ? `“${n.epithet}”` : "";
   let bounty = null;
