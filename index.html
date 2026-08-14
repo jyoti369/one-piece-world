@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
 <title>The World As You Know It</title>
 <style>
   :root {
@@ -704,6 +705,7 @@ function portrait(n) {
   let c = IMG_CACHE[n.id];
   if (!c) {
     c = IMG_CACHE[n.id] = { img: new Image(), ok: false };
+    c.img.referrerPolicy = "no-referrer";
     c.img.onload = () => { c.ok = true; };
     c.img.src = IMG_BASE + IMGS[n.id];
   }
@@ -884,10 +886,11 @@ function openCard(n) {
   selected = n;
   const pimg = document.getElementById("c-portrait");
   if (IMGS[n.id]) {
-    pimg.src = IMG_BASE + IMGS[n.id];
+    pimg.referrerPolicy = "no-referrer";
+    pimg.onerror = () => { pimg.style.display = "none"; };
     pimg.style.borderColor = FACTIONS[n.faction].color;
     pimg.style.display = "block";
-    pimg.onerror = () => { pimg.style.display = "none"; };
+    pimg.src = IMG_BASE + IMGS[n.id];
   } else {
     pimg.style.display = "none";
   }
