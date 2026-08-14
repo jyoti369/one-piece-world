@@ -134,6 +134,40 @@
     border-radius: 20px; padding: 6px 18px; font-size: 13px;
     display: none; z-index: 10; white-space: nowrap;
   }
+  #path-panel {
+    position: absolute; top: 12px; left: 12px; width: 300px; z-index: 9;
+    background: rgba(19,26,48,0.97); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px; display: none;
+    max-height: calc(100% - 24px); overflow-y: auto;
+  }
+  #path-panel h3 { color: var(--accent); font-size: 15px; margin-bottom: 8px; }
+  .prow { display: flex; align-items: center; gap: 6px; margin: 7px 0; flex-wrap: wrap; }
+  .parrow { color: var(--muted); }
+  #path-a, #path-b {
+    flex: 1; min-width: 110px; background: var(--bg); border: 1px solid var(--line);
+    color: var(--ink); border-radius: 8px; padding: 6px 8px; font-size: 12px;
+  }
+  #pathout { margin-top: 8px; font-size: 12px; }
+  #pathout .hop { padding: 6px 0; border-top: 1px solid var(--line); line-height: 1.5; }
+  #pathout .hop b { color: var(--accent); cursor: pointer; }
+  #pathout .hop .lbl { color: var(--muted); }
+  #pathout .sum { color: var(--accent); font-size: 13px; margin-bottom: 4px; }
+  #poster-bg {
+    position: fixed; inset: 0; background: rgba(5,8,18,0.9);
+    display: none; align-items: center; justify-content: center; z-index: 60;
+  }
+  #poster {
+    position: relative; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 20px; width: min(560px, calc(100vw - 24px));
+    max-height: calc(100vh - 50px); overflow-y: auto; text-align: center;
+  }
+  #poster h2 { color: var(--accent); font-size: 17px; }
+  #poster-img {
+    width: 100%; border-radius: 10px; margin: 12px 0;
+    border: 1px solid var(--line); background: var(--bg);
+  }
+  #poster .labrow { justify-content: center; }
+  #poster-status { font-size: 12px; color: var(--muted); }
   #lab-bg {
     position: fixed; inset: 0; background: rgba(5,8,18,0.88);
     display: none; align-items: center; justify-content: center; z-index: 60;
@@ -212,6 +246,7 @@
     #epnum { font-size: 16px; min-width: 40px; }
     #search { width: 110px; flex: 1; }
     #card { width: calc(100% - 24px); max-height: 55%; }
+    #path-panel { width: calc(100% - 24px); max-height: 60%; }
     #legend { display: none; }
     h1 { font-size: 16px; }
     .sub { display: none; }
@@ -234,6 +269,8 @@
     <button id="soundbtn" title="Toggle sound">🔊</button>
     <button id="dialoguebtn" title="Dialogue mode: cards speak their famous line">💬</button>
     <button id="labbtn" title="Voice lab: design and pick each character's voice">🎤</button>
+    <button id="pathbtn" title="Six degrees: how are two characters connected?">🧭</button>
+    <button id="posterbtn" title="Export your world as a poster">📸</button>
     <div class="sliderwrap">
       <div class="arcticks" id="arcticks"></div>
       <input type="range" id="slider" min="1" max="589" value="1">
@@ -258,10 +295,38 @@
     <div id="c-audit" style="display:none"></div>
     <div class="rels"><h3>Connections you've seen</h3><div id="c-rels"></div></div>
   </div>
+  <div id="path-panel">
+    <button class="close" id="pathclose">✕</button>
+    <h3>🧭 Six Degrees</h3>
+    <div class="prow">
+      <select id="path-a"></select>
+      <span class="parrow">→</span>
+      <select id="path-b"></select>
+    </div>
+    <div class="prow">
+      <button class="primary" id="pathgo">Find the chain</button>
+      <button id="pathrand">🎲 Surprise me</button>
+    </div>
+    <div id="pathout"></div>
+  </div>
   <div id="legend"></div>
   <div id="counter"></div>
   <div id="toast"></div>
   <div id="results"></div>
+</div>
+
+<div id="poster-bg">
+  <div id="poster">
+    <button class="close" id="posterclose">✕</button>
+    <h2>📸 Your world, as a poster</h2>
+    <p class="labsub">Everything you've seen up to episode <b id="poster-ep"></b>, drawn as one picture.</p>
+    <img id="poster-img" alt="poster preview">
+    <div class="labrow">
+      <button class="primary" id="poster-dl">⬇ Download PNG</button>
+      <button id="poster-link">🔗 Copy share link</button>
+      <span id="poster-status"></span>
+    </div>
+  </div>
 </div>
 
 <div id="lab-bg">
@@ -1142,6 +1207,223 @@ function keepAudition(n) {
   toast(`${n.name} is now voiced by ${auditionVoice} on this device.`);
   document.getElementById("c-audit").style.display = "none";
 }
+// ---------------- poster export ----------------
+function buildPoster() {
+  const W = 1200, H = 1500, x = document.createElement("canvas").getContext("2d");
+  x.canvas.width = W; x.canvas.height = H;
+  const g = x.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#10172e"); g.addColorStop(1, "#070b18");
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  x.strokeStyle = "#f5c542"; x.lineWidth = 3;
+  x.strokeRect(26, 26, W - 52, H - 52);
+  x.strokeStyle = "rgba(245,197,66,0.28)"; x.lineWidth = 1;
+  x.strokeRect(38, 38, W - 76, H - 76);
+
+  x.textAlign = "center";
+  x.fillStyle = "#e8ecf8";
+  x.font = "700 52px -apple-system, Helvetica, sans-serif";
+  x.fillText("The World ", W / 2 - 78, 118);
+  const wWidth = x.measureText("The World ").width;
+  x.fillStyle = "#f5c542";
+  x.fillText("As You Know It", W / 2 - 78 + wWidth / 2 + x.measureText("As You Know It").width / 2, 118);
+  x.fillStyle = "#8b94b0";
+  x.font = "20px -apple-system, Helvetica, sans-serif";
+  x.fillText(`every soul and bond seen up to episode ${ep}`, W / 2, 152);
+
+  // graph fitted into the middle panel
+  const RX = 70, RY = 200, RW = W - 140, RH = 1020;
+  const vis = NODES.filter(n => n.placed);
+  if (vis.length) {
+    const xs = vis.map(n => n.x), ys = vis.map(n => n.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const s = Math.min(RW / Math.max(maxX - minX, 1), RH / Math.max(maxY - minY, 1)) * 0.9;
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    const P = n => [RX + RW / 2 + (n.x - cx) * s, RY + RH / 2 + (n.y - cy) * s];
+    visibleEdges().forEach(e => {
+      if (!e.a.placed || !e.b.placed) return;
+      const [x1, y1] = P(e.a), [x2, y2] = P(e.b);
+      x.strokeStyle = LINKCOLORS[e.type] || "#607094";
+      x.globalAlpha = e.type === "meet" ? 0.3 : 0.5;
+      x.lineWidth = e.type === "crew" ? 2 : 1.2;
+      x.beginPath(); x.moveTo(x1, y1); x.lineTo(x2, y2); x.stroke();
+    });
+    x.globalAlpha = 1;
+    vis.forEach(n => {
+      const [px, py] = P(n);
+      const rad = Math.max(7, nodeR(n) * s * 0.85);
+      const img = exportablePortrait(n);
+      const col = FACTIONS[n.faction].color;
+      if (img) {
+        x.save();
+        x.beginPath(); x.arc(px, py, rad, 0, 6.29); x.clip();
+        const sq = Math.min(img.naturalWidth, img.naturalHeight);
+        x.drawImage(img, (img.naturalWidth - sq) / 2, (img.naturalHeight - sq) * 0.12, sq, sq,
+          px - rad, py - rad, rad * 2, rad * 2);
+        x.restore();
+        x.beginPath(); x.arc(px, py, rad, 0, 6.29);
+        x.strokeStyle = col; x.lineWidth = Math.max(1.5, rad * 0.14); x.stroke();
+      } else {
+        x.beginPath(); x.arc(px, py, rad, 0, 6.29); x.fillStyle = col; x.fill();
+      }
+      if (n.size >= 3) {
+        x.fillStyle = "rgba(232,236,248,0.92)";
+        x.font = "600 15px -apple-system, Helvetica, sans-serif";
+        x.fillText(n.name, px, py + rad + 18);
+      }
+    });
+  }
+
+  // stats strip
+  const sy = 1300;
+  x.strokeStyle = "rgba(245,197,66,0.3)"; x.lineWidth = 1;
+  x.beginPath(); x.moveTo(90, sy - 46); x.lineTo(W - 90, sy - 46); x.stroke();
+  const stats = [[visibleNodes().length, "characters met"], [visibleEdges().length, "bonds witnessed"],
+    [ARCS.filter(a => a[0] <= ep).length, "sagas sailed"], [ep, "episodes in"]];
+  stats.forEach((st, i) => {
+    const cx2 = 90 + (W - 180) * (i + 0.5) / stats.length;
+    x.fillStyle = "#f5c542";
+    x.font = "700 44px -apple-system, Helvetica, sans-serif";
+    x.fillText(String(st[0]), cx2, sy);
+    x.fillStyle = "#8b94b0";
+    x.font = "16px -apple-system, Helvetica, sans-serif";
+    x.fillText(st[1], cx2, sy + 26);
+  });
+  x.fillStyle = "#8b94b0";
+  x.font = "17px -apple-system, Helvetica, sans-serif";
+  x.fillText("jyoti369.github.io/one-piece-world", W / 2, H - 62);
+  return x.canvas;
+}
+function shareLink() {
+  return location.origin + location.pathname + "?ep=" + ep;
+}
+document.getElementById("posterbtn").onclick = () => {
+  document.getElementById("poster-ep").textContent = ep;
+  document.getElementById("poster-status").textContent = "";
+  const c = buildPoster();
+  try {
+    document.getElementById("poster-img").src = c.toDataURL("image/png");
+  } catch (e) {
+    document.getElementById("poster-status").textContent = "preview unavailable, download still works";
+  }
+  document.getElementById("poster-bg").style.display = "flex";
+  document.getElementById("poster-dl").onclick = () => {
+    try {
+      c.toBlob(b => {
+        if (!b) { document.getElementById("poster-status").textContent = "could not export image"; return; }
+        const u = URL.createObjectURL(b), a = document.createElement("a");
+        a.href = u; a.download = `my-one-piece-world-ep${ep}.png`; a.click();
+        setTimeout(() => URL.revokeObjectURL(u), 4000);
+      });
+    } catch (e) {
+      document.getElementById("poster-status").textContent = "could not export image";
+    }
+  };
+  document.getElementById("poster-link").onclick = () => {
+    const s = document.getElementById("poster-status");
+    const link = shareLink();
+    (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject())
+      .then(() => { s.textContent = "link copied"; })
+      .catch(() => { s.textContent = link; });
+  };
+};
+document.getElementById("posterclose").onclick = () => {
+  document.getElementById("poster-bg").style.display = "none";
+};
+
+// ---------------- six degrees ----------------
+let pathNodes = null, pathEdges = null;
+function ekey(e) { return e.a.id + "|" + e.b.id + "|" + e.ep; }
+function findChain(a, b) {
+  const adj = {};
+  visibleEdges().forEach(e => {
+    (adj[e.a.id] = adj[e.a.id] || []).push([e.b.id, e]);
+    (adj[e.b.id] = adj[e.b.id] || []).push([e.a.id, e]);
+  });
+  const prev = {}, seen = new Set([a.id]), q = [a.id];
+  while (q.length) {
+    const cur = q.shift();
+    if (cur === b.id) break;
+    (adj[cur] || []).forEach(([nx, e]) => {
+      if (!seen.has(nx)) { seen.add(nx); prev[nx] = [cur, e]; q.push(nx); }
+    });
+  }
+  if (!seen.has(b.id)) return null;
+  const hops = [];
+  let cur = b.id;
+  while (cur !== a.id) {
+    const [p, e] = prev[cur];
+    hops.unshift({ from: byId[p], to: byId[cur], edge: e });
+    cur = p;
+  }
+  return hops;
+}
+function clearPath() { pathNodes = pathEdges = null; }
+function fillPathSelects() {
+  const opts = visibleNodes().sort((x, y) => x.name.localeCompare(y.name))
+    .map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+  const a = document.getElementById("path-a"), b = document.getElementById("path-b");
+  const keepA = a.value, keepB = b.value;
+  a.innerHTML = opts; b.innerHTML = opts;
+  a.value = keepA && byId[keepA] && byId[keepA].debut <= ep ? keepA : "luffy";
+  if (!a.value) a.value = visibleNodes()[0].id;
+  const far = visibleNodes().slice().sort((x, y) => y.debut - x.debut)[0];
+  b.value = keepB && byId[keepB] && byId[keepB].debut <= ep ? keepB : (far ? far.id : a.value);
+}
+function runPath() {
+  const a = byId[document.getElementById("path-a").value];
+  const b = byId[document.getElementById("path-b").value];
+  const out = document.getElementById("pathout");
+  if (!a || !b) return;
+  if (a === b) { out.innerHTML = `<div class="hop">Pick two different characters.</div>`; clearPath(); return; }
+  const hops = findChain(a, b);
+  if (!hops) {
+    clearPath();
+    out.innerHTML = `<div class="hop">No chain you've seen yet links <b>${a.name}</b> to <b>${b.name}</b>. Watch on — the world keeps knitting itself together.</div>`;
+    return;
+  }
+  pathNodes = new Set([a.id, ...hops.map(h => h.to.id)]);
+  pathEdges = new Set(hops.map(h => ekey(h.edge)));
+  out.innerHTML = `<div class="sum">${hops.length} ${hops.length === 1 ? "step" : "steps"} apart</div>` +
+    hops.map(h =>
+      `<div class="hop"><b data-id="${h.from.id}">${h.from.name}</b> → <b data-id="${h.to.id}">${h.to.name}</b>
+        <br><span class="lbl">${h.edge.label} (ep ${h.edge.ep})</span></div>`).join("");
+  out.querySelectorAll("b[data-id]").forEach(el => {
+    el.onclick = () => { const n = byId[el.dataset.id]; openCard(n); focusNode(n); };
+  });
+  // frame the whole chain on screen
+  const ns = [a, ...hops.map(h => h.to)];
+  const xs = ns.map(n => n.x), ys = ns.map(n => n.y);
+  cam.x = (Math.min(...xs) + Math.max(...xs)) / 2;
+  cam.y = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const r = canvas.getBoundingClientRect();
+  const spanX = Math.max(Math.max(...xs) - Math.min(...xs), 120);
+  const spanY = Math.max(Math.max(...ys) - Math.min(...ys), 120);
+  cam.z = Math.max(0.35, Math.min(1.6, Math.min(r.width / (spanX + 260), r.height / (spanY + 260))));
+}
+document.getElementById("pathbtn").onclick = () => {
+  const p = document.getElementById("path-panel");
+  const showing = p.style.display === "block";
+  if (showing) { p.style.display = "none"; clearPath(); return; }
+  fillPathSelects();
+  p.style.display = "block";
+  runPath();
+};
+document.getElementById("pathclose").onclick = () => {
+  document.getElementById("path-panel").style.display = "none";
+  clearPath();
+};
+document.getElementById("pathgo").onclick = runPath;
+document.getElementById("pathrand").onclick = () => {
+  const vis = visibleNodes();
+  const pick = () => vis[Math.floor(hashf(String(performance.now()) + vis.length, 11) * vis.length)] || vis[0];
+  let a = pick(), b = pick(), guard = 0;
+  while (b === a && guard++ < 8) b = vis[(vis.indexOf(b) + 7) % vis.length];
+  document.getElementById("path-a").value = a.id;
+  document.getElementById("path-b").value = b.id;
+  runPath();
+};
+
 // ---------------- voice lab ----------------
 let labChar = null;
 function labQuoteFor(n) { const q = QUOTES[n.id]; return q && q[0] <= ep ? q : null; }
@@ -1571,10 +1853,26 @@ function portrait(n) {
   if (!c) {
     c = IMG_CACHE[n.id] = { img: new Image(), ok: false };
     c.img.referrerPolicy = "no-referrer";
+    // the wiki CDN sends access-control-allow-origin, so this keeps the
+    // poster canvas untainted and exportable as PNG
+    c.img.crossOrigin = "anonymous";
     c.img.onload = () => { c.ok = true; };
+    c.img.onerror = () => {
+      if (c.retried) return;
+      c.retried = true;                 // fall back to a plain load; poster will skip this face
+      const p = new Image();
+      p.referrerPolicy = "no-referrer";
+      p.onload = () => { c.img = p; c.ok = true; c.tainted = true; };
+      p.src = IMG_BASE + IMGS[n.id];
+    };
     c.img.src = IMG_BASE + IMGS[n.id];
   }
   return c.ok ? c.img : null;
+}
+// only CORS-clean images may be drawn into an exported poster
+function exportablePortrait(n) {
+  const c = IMG_CACHE[n.id];
+  return c && c.ok && !c.tainted ? c.img : null;
 }
 
 // ---------------- render ----------------
@@ -1609,11 +1907,24 @@ function draw() {
     if (!e.a.placed || !e.b.placed) return;
     const [x1, y1] = worldToScreen(e.a.x, e.a.y);
     const [x2, y2] = worldToScreen(e.b.x, e.b.y);
-    const dim = selected && e.a !== selected && e.b !== selected;
-    ctx.strokeStyle = LINKCOLORS[e.type] || "#607094";
-    ctx.globalAlpha = dim ? 0.06 : (e.type === "meet" ? 0.25 : 0.42);
-    ctx.lineWidth = e.type === "crew" ? 1.8 : 1.1;
-    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    const onPath = pathEdges && pathEdges.has(ekey(e));
+    const dim = pathEdges ? !onPath : (selected && e.a !== selected && e.b !== selected);
+    if (onPath) {
+      ctx.strokeStyle = "#f5c542";
+      ctx.globalAlpha = 0.95;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      // a pulse of light travelling the chain
+      const t = ((now / 1400) % 1);
+      const px = x1 + (x2 - x1) * t, py = y1 + (y2 - y1) * t;
+      ctx.beginPath(); ctx.arc(px, py, 4, 0, 6.29);
+      ctx.fillStyle = "#fff8e1"; ctx.fill();
+    } else {
+      ctx.strokeStyle = LINKCOLORS[e.type] || "#607094";
+      ctx.globalAlpha = dim ? (pathEdges ? 0.04 : 0.06) : (e.type === "meet" ? 0.25 : 0.42);
+      ctx.lineWidth = e.type === "crew" ? 1.8 : 1.1;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
   });
   ctx.globalAlpha = 1;
 
@@ -1622,8 +1933,15 @@ function draw() {
     const rad = nodeR(n) * cam.z;
     const age = now - n.born;
     const flash = age < 1200 ? (1 - age / 1200) : 0;
-    const dim = selected && n !== selected && !(conn && conn.has(n.id));
+    const onPath = pathNodes && pathNodes.has(n.id);
+    const dim = pathNodes ? !onPath : (selected && n !== selected && !(conn && conn.has(n.id)));
     const col = FACTIONS[n.faction].color;
+    if (onPath) {
+      ctx.beginPath();
+      ctx.arc(x, y, rad + 6 + Math.sin(now / 400) * 2, 0, 6.29);
+      ctx.strokeStyle = "#f5c542"; ctx.globalAlpha = 0.5; ctx.lineWidth = 2; ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
 
     if (flash > 0) {
       ctx.beginPath();
@@ -1659,7 +1977,7 @@ function draw() {
       ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
     }
     // labels: big names always, others when zoomed or highlighted
-    if (!dim && (n.size >= 3 || cam.z > 1.25 || n === hovered || n === selected || flash > 0)) {
+    if (!dim && (onPath || n.size >= 3 || cam.z > 1.25 || n === hovered || n === selected || flash > 0)) {
       ctx.fillStyle = dim ? "rgba(232,236,248,0.2)" : "rgba(232,236,248,0.92)";
       ctx.font = `${n.size >= 3 ? "600 " : ""}${Math.max(10, 11 * Math.min(cam.z, 1.4))}px -apple-system, sans-serif`;
       ctx.textAlign = "center";
@@ -1964,10 +2282,24 @@ canvas.addEventListener("touchend", () => {
 resize();
 document.getElementById("soundbtn").textContent = soundOn ? "🔊" : "🔇";
 setDialogue(dialogueOn);
+const linkEp = parseInt(new URLSearchParams(location.search).get("ep") || "0", 10);
 if (myEp >= 1) {
   document.getElementById("modal-bg").style.display = "none";
   applyMyEp(myEp);
-  setEpisode(Math.min(ep, myEp));
+  // a shared link never drags you past your own progress
+  if (linkEp >= 1) {
+    const target = Math.min(linkEp, myEp);
+    setEpisode(target);
+    if (linkEp > myEp) setTimeout(() => toast(`That link shows episode ${linkEp}. Kept you at ${myEp} — no spoilers.`), 600);
+  } else {
+    setEpisode(Math.min(ep, myEp));
+  }
+} else if (linkEp >= 1) {
+  // first-time visitor arriving from a shared link: adopt that world
+  document.getElementById("modal-bg").style.display = "none";
+  applyMyEp(linkEp);
+  setEpisode(myEp);
+  setTimeout(() => toast(`Someone's world as of episode ${myEp}. Tap ⚙ to set your own.`), 600);
 } else {
   // first run: modal stays open; a sane default underneath (persisted on confirm)
   myEp = DATA_MAX_EP;
