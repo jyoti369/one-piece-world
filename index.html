@@ -101,6 +101,12 @@
     line-height: 1.5; color: #f0d98c; clear: both;
   }
   #card .quote .ep { display: block; font-style: normal; font-size: 10px; color: var(--muted); margin-top: 4px; }
+  #c-audlink { font-size: 11px; color: var(--muted); cursor: pointer; margin: 6px 0; }
+  #c-audlink:hover { color: var(--accent); }
+  #c-audit { margin: 6px 0; display: flex; flex-wrap: wrap; gap: 5px; }
+  #c-audit button { font-size: 11px; padding: 4px 9px; border-radius: 6px; }
+  #c-audit .avoice.on { border-color: var(--accent); color: var(--accent); }
+  #c-audit #c-keep { background: var(--accent); color: #1a1408; font-weight: 700; border: none; }
   #card .rels { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
   #card .rels h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
   #card .rel { font-size: 12px; padding: 3px 0; line-height: 1.4; }
@@ -203,6 +209,8 @@
     <div class="meta" id="c-meta"></div>
     <div class="desc" id="c-desc"></div>
     <div class="quote" id="c-quote"></div>
+    <div id="c-audlink" style="display:none">🎬 audition other voices</div>
+    <div id="c-audit" style="display:none"></div>
     <div class="rels"><h3>Connections you've seen</h3><div id="c-rels"></div></div>
   </div>
   <div id="legend"></div>
@@ -1005,9 +1013,68 @@ fukaboshi:["Orus","Vow it solemnly, a prince ending a cycle of hate"]
 const FEMALE = new Set(["tashigi","shakky"]);
 const TTS_MODELS = ["gemini-2.5-flash-preview-tts","gemini-2.5-flash-tts","gemini-2.5-pro-preview-tts"];
 function castFor(n) {
+  try {
+    const ov = JSON.parse(localStorage.getItem("opw_cast_override") || "{}");
+    if (ov[n.id]) return ov[n.id];
+  } catch (e) {}
   if (CAST[n.id]) return CAST[n.id];
   if (FEMALE.has(n.id)) return ["Kore","Say it in character, a determined woman of the seas"];
   return [n.size >= 3 ? "Charon" : "Schedar", "Say it in character, a seasoned pirate-era voice"];
+}
+// audition: let the ear decide — same line, candidate voices, keep the best
+const POOLS = {
+  hero: ["Puck","Fenrir","Sadachbia","Achird","Zephyr","Laomedeia"],
+  deep: ["Charon","Orus","Algenib","Enceladus","Alnilam","Sulafat","Iapetus","Schedar","Algieba"],
+  female: ["Kore","Leda","Aoede","Despina","Gacrux","Callirrhoe","Vindemiatrix","Erinome","Autonoe"]
+};
+function candidatesFor(n) {
+  const cur = castFor(n)[0];
+  let pool = POOLS.deep;
+  if (POOLS.female.includes(cur)) pool = POOLS.female;
+  else if (POOLS.hero.includes(cur)) pool = POOLS.hero;
+  return [cur, ...pool.filter(v => v !== cur)].slice(0, 5);
+}
+let auditionVoice = null;
+async function auditionPlay(n, voiceName, btn) {
+  const key = localStorage.getItem("opw_gemini_key");
+  const q = QUOTES[n.id];
+  if (!key || !q) return;
+  document.querySelectorAll("#c-audit .avoice").forEach(b => b.classList.remove("on"));
+  btn.classList.add("on");
+  btn.textContent = voiceName + " …";
+  try {
+    const ck = "aud:" + n.id + ":" + voiceName;
+    let b64 = await vget(ck);
+    if (!b64) {
+      const direction = castFor(n)[1];
+      b64 = await ttsFetch(key, voiceName, direction, q[1]);
+      vput(ck, b64);
+    }
+    auditionVoice = voiceName;
+    playPcm(b64);
+    btn.textContent = voiceName;
+    document.getElementById("c-keep").style.display = "inline-block";
+  } catch (e) {
+    btn.textContent = voiceName + " ✕";
+  }
+}
+function keepAudition(n) {
+  if (!auditionVoice) return;
+  let ov = {};
+  try { ov = JSON.parse(localStorage.getItem("opw_cast_override") || "{}"); } catch (e) {}
+  ov[n.id] = [auditionVoice, castFor(n)[1]];
+  localStorage.setItem("opw_cast_override", JSON.stringify(ov));
+  toast(`${n.name} is now voiced by ${auditionVoice} on this device.`);
+  document.getElementById("c-audit").style.display = "none";
+}
+function buildAudition(n) {
+  const el = document.getElementById("c-audit");
+  auditionVoice = null;
+  el.innerHTML = candidatesFor(n).map(v => `<button class="avoice" data-v="${v}">${v}</button>`).join("") +
+    ` <button id="c-keep" style="display:none">✓ keep</button>`;
+  el.style.display = "block";
+  el.querySelectorAll(".avoice").forEach(b => { b.onclick = () => auditionPlay(n, b.dataset.v, b); });
+  el.querySelector("#c-keep").onclick = () => keepAudition(n);
 }
 let vdb = null;
 function vopen() {
@@ -1059,38 +1126,73 @@ function setQuoteStatus(msg) {
   if (msg) { s.dataset.prev = s.dataset.prev || s.textContent; s.textContent = msg; }
   else if (s.dataset.prev) { s.textContent = s.dataset.prev; delete s.dataset.prev; }
 }
+// dub-style prompt: director's note + persona, per Gemini TTS prompting guidance
+function dubPrompt(direction, line) {
+  return `You are voicing a character in an English anime dub. ${direction}. Deliver only the line, exactly as written, fully in character: "${line}"`;
+}
+// two API generations exist: newer keys use /interactions, classic AIza keys use generateContent
+async function ttsFetch(key, voiceName, direction, line) {
+  const input = dubPrompt(direction, line);
+  const pref = localStorage.getItem("opw_tts_api");
+  const order = pref === "legacy" ? ["legacy", "interactions"] : ["interactions", "legacy"];
+  let lastErr = null;
+  for (const api of order) {
+    try {
+      let b64 = null;
+      if (api === "interactions") {
+        const r = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+          body: JSON.stringify({
+            model: "gemini-3.1-flash-tts-preview",
+            input,
+            response_format: { type: "audio" },
+            generation_config: { speech_config: [{ voice: voiceName }] }
+          })
+        });
+        if (!r.ok) throw new Error("interactions http " + r.status);
+        const j = await r.json();
+        const c = j.steps && j.steps[0] && j.steps[0].content && j.steps[0].content[0];
+        if (c && c.type === "audio" && c.data) b64 = c.data;
+      } else {
+        const preferred = localStorage.getItem("opw_tts_model");
+        const models = preferred ? [preferred, ...TTS_MODELS.filter(m => m !== preferred)] : TTS_MODELS;
+        for (const m of models) {
+          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: input }] }],
+              generationConfig: {
+                responseModalities: ["AUDIO"],
+                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } }
+              }
+            })
+          });
+          if (!r.ok) { if (r.status === 404) continue; throw new Error("http " + r.status); }
+          const j = await r.json();
+          const p = j.candidates && j.candidates[0] && j.candidates[0].content
+            && j.candidates[0].content.parts && j.candidates[0].content.parts[0];
+          if (p && p.inlineData && p.inlineData.data) {
+            b64 = p.inlineData.data;
+            localStorage.setItem("opw_tts_model", m);
+            break;
+          }
+        }
+      }
+      if (b64) { localStorage.setItem("opw_tts_api", api); return b64; }
+      throw new Error("no audio in response");
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error("tts failed");
+}
 async function speakGemini(n, q, key) {
-  const ck = "v2:" + n.id;
+  const [voiceName, direction] = castFor(n);
+  const ck = "v3:" + n.id + ":" + voiceName;
   let b64 = await vget(ck);
   if (!b64) {
     setQuoteStatus("🎙 summoning their voice…");
-    const [voiceName, style] = castFor(n);
-    const body = JSON.stringify({
-      contents: [{ parts: [{ text: `${style}: "${q[1]}"` }] }],
-      generationConfig: {
-        responseModalities: ["AUDIO"],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } }
-      }
-    });
-    let lastErr = null;
-    const preferred = localStorage.getItem("opw_tts_model");
-    const models = preferred ? [preferred, ...TTS_MODELS.filter(m => m !== preferred)] : TTS_MODELS;
-    for (const m of models) {
-      try {
-        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`,
-          { method: "POST", headers: { "Content-Type": "application/json" }, body });
-        if (!r.ok) { lastErr = new Error("http " + r.status); if (r.status === 404) continue; else break; }
-        const j = await r.json();
-        b64 = j.candidates && j.candidates[0] && j.candidates[0].content
-          && j.candidates[0].content.parts && j.candidates[0].content.parts[0]
-          && j.candidates[0].content.parts[0].inlineData
-          && j.candidates[0].content.parts[0].inlineData.data;
-        if (b64) { localStorage.setItem("opw_tts_model", m); break; }
-        lastErr = new Error("no audio in response");
-      } catch (e) { lastErr = e; }
-    }
-    setQuoteStatus(null);
-    if (!b64) throw lastErr || new Error("tts failed");
+    try { b64 = await ttsFetch(key, voiceName, direction, q[1]); }
+    finally { setQuoteStatus(null); }
     vput(ck, b64);
   }
   if (selected !== n) return; // user moved on while we were generating
@@ -1340,12 +1442,22 @@ function openCard(n) {
     qel.style.display = "block";
     qel.style.cursor = "pointer";
     qel.onclick = () => speakQuote(n);
+    const al = document.getElementById("c-audlink");
+    const hasKey = !!localStorage.getItem("opw_gemini_key");
+    al.style.display = hasKey ? "block" : "none";
+    al.onclick = () => buildAudition(n);
+    document.getElementById("c-audit").style.display = "none";
     speakQuote(n);
   } else if (q) {
     qel.innerHTML = `<span style="opacity:.55">🔒 has a famous line you haven't heard yet…</span>`;
     qel.style.display = "block";
+    qel.onclick = null; qel.style.cursor = "default";
+    document.getElementById("c-audlink").style.display = "none";
+    document.getElementById("c-audit").style.display = "none";
   } else {
     qel.style.display = "none";
+    document.getElementById("c-audlink").style.display = "none";
+    document.getElementById("c-audit").style.display = "none";
   }
   const rels = visibleEdges().filter(e => e.a === n || e.b === n)
     .sort((x, y) => x.ep - y.ep);
