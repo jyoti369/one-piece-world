@@ -94,6 +94,13 @@
   #card .meta { font-size: 12px; color: var(--muted); margin: 8px 0; line-height: 1.7; }
   #card .meta b { color: var(--ink); font-weight: 600; }
   #card .desc { font-size: 13px; line-height: 1.55; margin: 8px 0; }
+  #card .quote {
+    display: none; margin: 10px 0; padding: 8px 12px;
+    border-left: 3px solid var(--accent); background: rgba(245,197,66,0.07);
+    border-radius: 0 8px 8px 0; font-style: italic; font-size: 13px;
+    line-height: 1.5; color: #f0d98c; clear: both;
+  }
+  #card .quote .ep { display: block; font-style: normal; font-size: 10px; color: var(--muted); margin-top: 4px; }
   #card .rels { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
   #card .rels h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
   #card .rel { font-size: 12px; padding: 3px 0; line-height: 1.4; }
@@ -174,6 +181,7 @@
       <span id="epnum">1</span>
     </div>
     <button id="playbtn" class="primary">▶ Play</button>
+    <button id="soundbtn" title="Toggle sound">🔊</button>
     <div class="sliderwrap">
       <div class="arcticks" id="arcticks"></div>
       <input type="range" id="slider" min="1" max="589" value="1">
@@ -193,6 +201,7 @@
     <div class="epithet" id="c-epithet"></div>
     <div class="meta" id="c-meta"></div>
     <div class="desc" id="c-desc"></div>
+    <div class="quote" id="c-quote"></div>
     <div class="rels"><h3>Connections you've seen</h3><div id="c-rels"></div></div>
   </div>
   <div id="legend"></div>
@@ -599,6 +608,93 @@ wyper:"a/a6/Wyper_Anime_Pre_Timeskip_Infobox.png/revision/latest/scale-to-width-
 zeff:"d/d9/Zeff_Anime_Infobox.png/revision/latest/scale-to-width-down/134?cb=20230617083525",
 zoro:"5/52/Roronoa_Zoro_Anime_Post_Timeskip_Infobox.png/revision/latest/scale-to-width-down/75?cb=20241029161719"
 };
+// famous lines, each stamped with the episode it's heard (quote hidden until then)
+const QUOTES = {
+luffy:[1,"I'm gonna be King of the Pirates!"],
+zoro:[24,"Scars on the back are a swordsman's shame."],
+nami:[37,"Luffy... help me."],
+usopp:[8,"I am the brave warrior of the sea, Captain Usopp!"],
+sanji:[21,"Anyone who's starving gets to eat. That's a cook's duty."],
+chopper:[90,"I'll become a doctor who can cure any disease!"],
+robin:[274,"I want to live!"],
+franky:[240,"This week's me has been SUPER!"],
+brook:[337,"Yohohoho! May I see your panties?"],
+roger:[1,"My treasure? It's yours if you can find it. I left everything in that place."],
+shanks:[4,"You can pour food on me, you can spit on me... but no one hurts a friend of mine."],
+whitebeard:[485,"The One Piece... is real!"],
+ace:[483,"Thank you... for loving me!"],
+blackbeard:[146,"People's dreams never die!"],
+buggy:[8,"I'm the flashiest pirate on all the seas!"],
+mihawk:[24,"Grow strong, Roronoa. However long it takes, I will wait for you."],
+crocodile:[110,"Idealists like you are always the first to die in this sea."],
+vivi:[126,"Please... stop the fighting!!"],
+smoker:[53,"I'll chase you to the ends of the Grand Line, Straw Hat."],
+tashigi:[49,"I'll take back every famous blade from the hands of criminals!"],
+garp:[314,"Fist of Love!"],
+dragon:[53,"The winds of a new era are blowing."],
+coby:[3,"I'll become a Marine Admiral!"],
+law:[397,"The weak don't get to choose how they die."],
+hancock:[411,"Whatever I do, the world will forgive me. Because I am beautiful!"],
+jinbe:[489,"It's not what you've lost. What remains? What do you still have?!"],
+ivankov:[443,"Miracles only smile on those who never give up!"],
+kuma:[405,"If you were to take a trip... where would you like to go?"],
+kizaru:[402,"Have you ever been kicked at the speed of light?"],
+aokiji:[227,"My justice is lazy justice."],
+akainu:[464,"Not a single one of them escapes. That is absolute justice."],
+sengoku:[461,"His father was... Gol D. Roger!"],
+moria:[343,"Kishishishi! Your shadow belongs to me!"],
+perona:[345,"Horohorohoro! Negative hollow!"],
+enel:[161,"Yahahaha! I am God!"],
+bellamy:[151,"The age of dreamers is over!"],
+doflamingo:[152,"A new era has begun!"],
+rayleigh:[400,"Go and see for yourself. The man who will shake this whole world."],
+arlong:[31,"Fish-men are the superior race!"],
+zeff:[20,"Anyone starving at sea gets fed at my restaurant. No exceptions."],
+krieg:[21,"In this sea, only force decides everything!"],
+gin:[21,"That was the kindest thing anyone has ever done for me."],
+kuro:[9,"A plan three years in the making cannot fail."],
+kaya:[10,"Usopp's lies always made me feel better."],
+alvida:[1,"Who is the most beautiful woman on all the seas?"],
+morgan:[2,"I am Great Captain Morgan!"],
+mr2:[451,"I'd gladly throw my life away for a friend!"],
+mr3:[71,"My wax is harder than steel!"],
+igaram:[64,"Ma... ma... maaa..."],
+wapol:[79,"Munch munch... I'll eat the whole country!"],
+kureha:[80,"The secret of my youth? Mind your own business!"],
+hiluluk:[86,"When does a man die? When he is forgotten!"],
+dorry:[71,"Gabababa! A duel of honor has no end!"],
+brogy:[71,"A hundred years, and neither of us has doubted the duel once."],
+cricket:[148,"A man's romance never dies!"],
+ganfall:[156,"Heso!"],
+wyper:[157,"Return the lights of Shandora!"],
+foxy:[208,"Fehfehfeh! You fell right into my trap!"],
+lucci:[272,"This is the world of dark justice."],
+kaku:[289,"Yes, I turned into a giraffe. Laugh and I will cut you."],
+kalifa:[245,"That's sexual harassment."],
+paulie:[232,"You shameless woman! Put some clothes on!"],
+kid:[396,"Laugh at my dream, and I'll make you regret it."],
+hawkins:[397,"The cards never lie."],
+bonney:[396,"Let me eat in peace!"],
+apoo:[396,"Apapapa! What a show!"],
+camie:[385,"Takoyaki is the best food in the whole ocean!"],
+hatchan:[386,"Nyu! I just wanted to open a takoyaki shop."],
+shakky:[400,"The Marines chased me for years. They were a hundred years too early."],
+sentomaru:[401,"I'm the tightest-lipped man in the world!"],
+magellan:[430,"In Impel Down, despair is the only law."],
+shirahoshi:[531,"I'm sorry... I'm such a crybaby."],
+neptune:[527,"Jamon!"],
+fukaboshi:[567,"We will return this hatred to nothing!"],
+hody:[530,"Humans are the enemy of all fish-men!"],
+decken:[531,"Shirahoshi... marry me, or die!"],
+fishertiger:[544,"I never hated humans. I just could never love them."],
+otohime:[543,"Don't let your children inherit our hatred."],
+bigmom:[572,"Mama mama! Where is my candy?!"],
+kinemon:[584,"I am Kin'emon of Wano! Return my body to me!"],
+dadan:[505,"Why didn't you save Ace?!"],
+sabo:[504,"I'll be free. The sea is calling me!"],
+marco:[472,"We won't let our old man die alone!"]
+};
+
 
 </script>
 
@@ -657,7 +753,7 @@ function visibleEdges() { return EDGES.filter(e => e.ep <= ep); }
 
 function syncPlacement() {
   const vis = visibleNodes();
-  vis.forEach(n => { if (!n.placed) seedNode(n); });
+  vis.forEach(n => { if (!n.placed) { seedNode(n); blip(n); } });
   NODES.forEach(n => { if (n.debut > ep) n.placed = false; });
   if (vis.length !== lastCount) lastCount = vis.length;
 }
@@ -697,6 +793,92 @@ function tick() {
     n.x += n.vx; n.y += n.vy;
   });
 }
+
+// ---------------- sound (all synthesized, no audio files) ----------------
+let AC = null;
+let soundOn = localStorage.getItem("opw_sound") !== "off";
+let blipBudget = 0;
+let waveNodes = null;
+
+function ac() {
+  if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+  if (AC.state === "suspended") AC.resume();
+  return AC;
+}
+function blip(n) {
+  if (!soundOn || !AC || blipBudget <= 0) return;
+  blipBudget--;
+  const a = ac(), t = a.currentTime;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = "triangle";
+  const base = 640 - n.size * 95 + hashf(n.id, 7) * 60;
+  o.frequency.setValueAtTime(base, t);
+  o.frequency.exponentialRampToValueAtTime(base * 1.5, t + 0.09);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.1, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+  o.connect(g).connect(a.destination);
+  o.start(t); o.stop(t + 0.45);
+  if (n.size >= 4) { // an Emperor-tier legend enters: low boom
+    const o2 = a.createOscillator(), g2 = a.createGain();
+    o2.type = "sine";
+    o2.frequency.setValueAtTime(75, t);
+    o2.frequency.exponentialRampToValueAtTime(38, t + 0.6);
+    g2.gain.setValueAtTime(0.0001, t);
+    g2.gain.exponentialRampToValueAtTime(0.28, t + 0.03);
+    g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    o2.connect(g2).connect(a.destination);
+    o2.start(t); o2.stop(t + 1);
+  }
+}
+function tickSound() {
+  if (!soundOn) return;
+  const a = ac(), t = a.currentTime;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = "sine";
+  o.frequency.setValueAtTime(880, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.06, t + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+  o.connect(g).connect(a.destination);
+  o.start(t); o.stop(t + 0.1);
+}
+function startWaves() {
+  if (!soundOn || waveNodes) return;
+  const a = ac();
+  const buf = a.createBuffer(1, a.sampleRate * 2, a.sampleRate);
+  const d = buf.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < d.length; i++) {
+    last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+    d[i] = last * 3.5;
+  }
+  const src = a.createBufferSource(); src.buffer = buf; src.loop = true;
+  const f = a.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 420;
+  const g = a.createGain(); g.gain.value = 0.045;
+  const lfo = a.createOscillator(); lfo.frequency.value = 0.13;
+  const lg = a.createGain(); lg.gain.value = 0.022;
+  lfo.connect(lg).connect(g.gain);
+  src.connect(f).connect(g).connect(a.destination);
+  src.start(); lfo.start();
+  waveNodes = { src, lfo, g };
+}
+function stopWaves() {
+  if (!waveNodes) return;
+  const w = waveNodes; waveNodes = null;
+  try {
+    w.g.gain.setTargetAtTime(0.0001, AC.currentTime, 0.25);
+    setTimeout(() => { try { w.src.stop(); w.lfo.stop(); } catch (e) {} }, 800);
+  } catch (e) {}
+}
+function setSound(on) {
+  soundOn = on;
+  localStorage.setItem("opw_sound", on ? "on" : "off");
+  document.getElementById("soundbtn").textContent = on ? "🔊" : "🔇";
+  if (!on) stopWaves();
+  else if (playing) { ac(); startWaves(); }
+}
+document.getElementById("soundbtn").onclick = () => { ac(); setSound(!soundOn); };
 
 // ---------------- portraits ----------------
 const IMG_CACHE = {};
@@ -819,7 +1001,10 @@ let playFrames = 0;
 
 // ---------------- controls ----------------
 function setEpisode(v, fromSlider) {
+  const prev = ep;
   ep = Math.max(1, Math.min(v, myEp));
+  // arrival sounds only for gradual movement; a big jump would be a cacophony
+  blipBudget = (playing || Math.abs(ep - prev) <= 3) ? 6 : 0;
   if (!fromSlider) slider.value = ep;
   epnum.textContent = ep;
   localStorage.setItem("opw_slider", ep);
@@ -836,6 +1021,7 @@ function setPlaying(on) {
   playing = on;
   document.getElementById("playbtn").textContent = on ? "❚❚ Pause" : "▶ Play";
   if (on && ep >= myEp) setEpisode(1);
+  if (on && soundOn) { ac(); startWaves(); } else stopWaves();
 }
 document.getElementById("playbtn").onclick = () => setPlaying(!playing);
 slider.addEventListener("input", () => { setPlaying(false); setEpisode(parseInt(slider.value,10), true); });
@@ -903,6 +1089,17 @@ function openCard(n) {
     `First seen: episode <b>${n.debut}</b><br>` +
     (bounty !== null ? `Bounty (as of ep ${ep}): <b>${fmtBounty(bounty)}</b>` : `Bounty: <span style="opacity:.6">none known yet</span>`);
   document.getElementById("c-desc").textContent = n.blurb;
+  const qel = document.getElementById("c-quote");
+  const q = QUOTES[n.id];
+  if (q && q[0] <= ep) {
+    qel.innerHTML = `“${q[1]}”<span class="ep">heard around episode ${q[0]}</span>`;
+    qel.style.display = "block";
+  } else if (q) {
+    qel.innerHTML = `<span style="opacity:.55">🔒 has a famous line you haven't heard yet…</span>`;
+    qel.style.display = "block";
+  } else {
+    qel.style.display = "none";
+  }
   const rels = visibleEdges().filter(e => e.a === n || e.b === n)
     .sort((x, y) => x.ep - y.ep);
   document.getElementById("c-rels").innerHTML = rels.length
@@ -1009,7 +1206,7 @@ canvas.addEventListener("mousemove", e => {
 canvas.addEventListener("click", e => {
   if (dragMoved) return;
   const n = pickNode(e.offsetX, e.offsetY);
-  if (n) { openCard(n); } else { closeCard(); }
+  if (n) { ac(); tickSound(); openCard(n); } else { closeCard(); }
 });
 canvas.addEventListener("wheel", e => {
   e.preventDefault();
@@ -1040,7 +1237,7 @@ canvas.addEventListener("touchmove", e => {
 canvas.addEventListener("touchend", () => {
   if (!dragMoved && touchStart) {
     const n = pickNode(touchStart[0], touchStart[1]);
-    if (n) openCard(n); else closeCard();
+    if (n) { ac(); tickSound(); openCard(n); } else closeCard();
   }
   lastP = touchStart = null;
 });
@@ -1058,6 +1255,7 @@ canvas.addEventListener("touchend", () => {
 
 // ---------------- boot ----------------
 resize();
+document.getElementById("soundbtn").textContent = soundOn ? "🔊" : "🔇";
 if (myEp >= 1) {
   document.getElementById("modal-bg").style.display = "none";
   applyMyEp(myEp);
