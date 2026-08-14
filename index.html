@@ -182,6 +182,7 @@
     </div>
     <button id="playbtn" class="primary">▶ Play</button>
     <button id="soundbtn" title="Toggle sound">🔊</button>
+    <button id="dialoguebtn" title="Dialogue mode: cards speak their famous line">💬</button>
     <div class="sliderwrap">
       <div class="arcticks" id="arcticks"></div>
       <input type="range" id="slider" min="1" max="589" value="1">
@@ -880,6 +881,67 @@ function setSound(on) {
 }
 document.getElementById("soundbtn").onclick = () => { ac(); setSound(!soundOn); };
 
+// ---------------- dialogue mode (device TTS, tuned per character) ----------------
+let dialogueOn = localStorage.getItem("opw_dialogue") !== "off";
+// [pitch, rate] — a caricature of each voice, not the real actors
+const VOICE = {
+  luffy:[1.5,1.15], chopper:[1.9,1.2], nami:[1.4,1.05], usopp:[1.35,1.25],
+  sanji:[1.05,1.0], zoro:[0.7,0.95], robin:[1.0,0.88], franky:[0.75,1.05],
+  brook:[0.85,1.0], whitebeard:[0.45,0.8], bigmom:[0.7,0.9], shanks:[0.85,0.95],
+  roger:[0.6,0.9], garp:[0.65,1.05], sengoku:[0.6,0.9], akainu:[0.5,0.85],
+  aokiji:[0.7,0.78], kizaru:[0.75,0.75], blackbeard:[0.55,1.0], buggy:[1.2,1.15],
+  enel:[1.1,0.9], moria:[0.6,0.95], perona:[1.6,1.15], hancock:[1.2,0.92],
+  ivankov:[1.3,1.1], mihawk:[0.65,0.85], crocodile:[0.55,0.85], doflamingo:[0.8,0.95],
+  kuma:[0.5,0.72], jinbe:[0.6,0.9], magellan:[0.55,0.9], neptune:[0.55,0.85],
+  shirahoshi:[1.7,0.95], hody:[0.65,1.0], kinemon:[0.9,1.0], law:[0.8,0.88],
+  kid:[0.85,1.1], smoker:[0.65,0.9], kureha:[1.3,1.0], hiluluk:[1.0,1.08],
+  wapol:[1.1,1.1], vivi:[1.4,1.0], kaya:[1.5,1.0], alvida:[1.25,1.0],
+  dadan:[1.1,1.15], otohime:[1.4,0.95], fishertiger:[0.65,0.88], rayleigh:[0.75,0.9],
+  zeff:[0.8,0.95], gin:[0.9,0.88], mr2:[1.3,1.2], igaram:[0.9,0.8],
+  dorry:[0.5,0.85], brogy:[0.55,0.85], coby:[1.4,1.1], tashigi:[1.35,1.05],
+  dragon:[0.6,0.85], ace:[1.0,1.0], sabo:[1.2,1.05], camie:[1.5,1.1],
+  hatchan:[1.1,1.0], bellamy:[1.0,1.15], foxy:[1.15,1.1], lucci:[0.7,0.85],
+  kalifa:[1.3,0.95], paulie:[0.95,1.1], decken:[1.0,1.1], fukaboshi:[0.85,0.95],
+  kuro:[0.85,0.9], krieg:[0.75,1.0], arlong:[0.7,1.0], morgan:[0.7,1.05],
+  marco:[0.9,0.95], mr3:[1.05,1.0], wyper:[0.9,1.05], ganfall:[0.8,0.9],
+  cricket:[0.8,0.95], shakky:[1.2,0.9], sentomaru:[0.9,1.05], hawkins:[0.85,0.8],
+  bonney:[1.3,1.15], apoo:[1.2,1.2], kaku:[1.0,1.0]
+};
+const VOICE_DEFAULT = { 1:[1.1,1.05], 2:[1.0,1.0], 3:[0.85,0.95], 4:[0.6,0.9] };
+let ttsVoice = null;
+function pickTtsVoice() {
+  if (!("speechSynthesis" in window)) return;
+  const vs = speechSynthesis.getVoices();
+  ttsVoice = vs.find(v => v.lang.startsWith("en") && /Google US English|Samantha|Daniel/i.test(v.name))
+    || vs.find(v => v.lang.startsWith("en")) || null;
+}
+if ("speechSynthesis" in window) {
+  pickTtsVoice();
+  speechSynthesis.onvoiceschanged = pickTtsVoice;
+}
+function speakQuote(n) {
+  if (!dialogueOn || !("speechSynthesis" in window)) return;
+  const q = QUOTES[n.id];
+  if (!q || q[0] > ep) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(q[1]);
+  const [p, r] = VOICE[n.id] || VOICE_DEFAULT[n.size];
+  u.pitch = p; u.rate = r; u.volume = 0.95;
+  if (ttsVoice) u.voice = ttsVoice;
+  speechSynthesis.speak(u);
+}
+function setDialogue(on) {
+  dialogueOn = on;
+  localStorage.setItem("opw_dialogue", on ? "on" : "off");
+  document.getElementById("dialoguebtn").textContent = on ? "💬" : "🤐";
+  document.getElementById("dialoguebtn").style.opacity = on ? "1" : "0.55";
+  if (!on && "speechSynthesis" in window) speechSynthesis.cancel();
+}
+document.getElementById("dialoguebtn").onclick = () => {
+  setDialogue(!dialogueOn);
+  if (dialogueOn && selected) speakQuote(selected);
+};
+
 // ---------------- portraits ----------------
 const IMG_CACHE = {};
 function portrait(n) {
@@ -1092,8 +1154,11 @@ function openCard(n) {
   const qel = document.getElementById("c-quote");
   const q = QUOTES[n.id];
   if (q && q[0] <= ep) {
-    qel.innerHTML = `“${q[1]}”<span class="ep">heard around episode ${q[0]}</span>`;
+    qel.innerHTML = `“${q[1]}”<span class="ep">heard around episode ${q[0]}${dialogueOn ? " · tap quote to replay" : ""}</span>`;
     qel.style.display = "block";
+    qel.style.cursor = "pointer";
+    qel.onclick = () => speakQuote(n);
+    speakQuote(n);
   } else if (q) {
     qel.innerHTML = `<span style="opacity:.55">🔒 has a famous line you haven't heard yet…</span>`;
     qel.style.display = "block";
@@ -1114,7 +1179,11 @@ function openCard(n) {
     el.onclick = () => { const t = byId[el.dataset.id]; if (t && t.debut <= ep) { openCard(t); focusNode(t); } };
   });
 }
-function closeCard() { selected = null; document.getElementById("card").style.display = "none"; }
+function closeCard() {
+  selected = null;
+  document.getElementById("card").style.display = "none";
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+}
 document.getElementById("cardclose").onclick = closeCard;
 
 function focusNode(n) {
@@ -1256,6 +1325,7 @@ canvas.addEventListener("touchend", () => {
 // ---------------- boot ----------------
 resize();
 document.getElementById("soundbtn").textContent = soundOn ? "🔊" : "🔇";
+setDialogue(dialogueOn);
 if (myEp >= 1) {
   document.getElementById("modal-bg").style.display = "none";
   applyMyEp(myEp);
