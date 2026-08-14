@@ -120,7 +120,8 @@
   }
   #modal {
     background: var(--panel); border: 1px solid var(--line);
-    border-radius: 14px; padding: 28px; width: 340px; text-align: center;
+    border-radius: 14px; padding: 28px; text-align: center;
+    width: min(340px, calc(100vw - 32px)); margin: auto;
   }
   #modal h2 { color: var(--accent); margin-bottom: 8px; font-size: 18px; }
   #modal p { color: var(--muted); font-size: 13px; line-height: 1.6; margin-bottom: 16px; }
@@ -138,6 +139,15 @@
   #results div { padding: 6px 12px; font-size: 13px; cursor: pointer; }
   #results div:hover { background: var(--panel2); }
   #results .nomatch { color: var(--muted); cursor: default; }
+  @media (max-width: 640px) {
+    .arcticks { display: none; }
+    .sliderwrap { padding-top: 0; min-width: 180px; }
+    #search { width: 120px; flex: 1; }
+    #card { width: calc(100% - 24px); max-height: 55%; }
+    #legend { display: none; }
+    h1 { font-size: 16px; }
+    .sub { display: none; }
+  }
 </style>
 </head>
 <body>
